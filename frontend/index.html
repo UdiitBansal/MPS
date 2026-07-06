@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
+
+<title>Multi-Document Research Summarizer</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+
+<link rel="stylesheet"
+href="style.css">
+
+</head>
+
+<body>
+
+<div class="background"></div>
+
+<aside class="sidebar">
+
+    <div class="logo">
+
+        <div class="logo-icon">
+
+            <i class="fa-solid fa-brain"></i>
+
+        </div>
+
+        <div>
+
+            <h2>Research AI</h2>
+
+            <p>Assistant</p>
+
+        </div>
+
+    </div>
+
+    <nav>
+
+        <a href="#" class="active">
+
+            <i class="fa-solid fa-house"></i>
+
+            Dashboard
+
+        </a>
+
+        <a href="#upload">
+
+            <i class="fa-solid fa-file-arrow-up"></i>
+
+            Upload PDFs
+
+        </a>
+
+        <a href="#summary">
+
+            <i class="fa-solid fa-file-lines"></i>
+
+            Executive Summary
+
+        </a>
+
+        <a href="#chat">
+
+            <i class="fa-solid fa-comments"></i>
+
+            AI Chat
+
+        </a>
+
+        <a href="#sourcesSection">
+
+            <i class="fa-solid fa-book-open"></i>
+
+            Sources
+
+        </a>
+
+        <a href="#analytics">
+
+            <i class="fa-solid fa-chart-simple"></i>
+
+            Analytics
+
+        </a>
+
+    </nav>
+
+</aside>
+
+<div class="main-content">
+
+<header class="topbar">
+
+    <div>
+
+        <h1>
+
+            AI Research Assistant
+
+        </h1>
+
+        <p>
+
+            Multi Document Research Summarizer using
+            FastAPI • ChromaDB • BM25 • Ollama
+
+        </p>
+
+    </div>
+
+    <div class="server-status">
+
+        <span class="dot"></span>
+
+        Backend Online
+
+    </div>
+
+</header>
+
+<section class="hero">
+
+    <div class="hero-left">
+
+        <h2>
+
+            Analyze Multiple PDF Documents
+            Using Artificial Intelligence
+
+        </h2>
+
+        <p>
+
+            Upload multiple PDF documents.
+
+            The system automatically extracts text,
+            generates embeddings,
+            creates a hybrid index,
+            prepares an executive summary
+            and lets you chat with your documents.
+
+        </p>
+
+        <div class="hero-buttons">
+
+            <button id="heroUploadBtn" class="primary-btn">
+
+                <i class="fa-solid fa-upload"></i>
+
+                Upload PDFs
+
+            </button>
+
+            <button class="secondary-btn">
+
+                <i class="fa-solid fa-circle-info"></i>
+
+                Learn More
+
+            </button>
+
+        </div>
+
+    </div>
+
+    <div class="hero-right">
+
+        <img
+            src="assets/hero.svg"
+            alt="Research">
+
+    </div>
+
+</section>
+
+<section class="stats" id="analytics">
+
+    <div class="stat-card">
+
+        <div class="stat-icon blue">
+
+            <i class="fa-solid fa-file-pdf"></i>
+
+        </div>
+
+        <div>
+
+            <h3 id="pdfCount">0</h3>
+
+            <p>Uploaded PDFs</p>
+
+        </div>
+
+    </div>
+
+    <div class="stat-card">
+
+        <div class="stat-icon purple">
+
+            <i class="fa-solid fa-layer-group"></i>
+
+        </div>
+
+        <div>
+
+            <h3 id="chunkCount">0</h3>
+
+            <p>Text Chunks</p>
+
+        </div>
+
+    </div>
+
+    <div class="stat-card">
+
+        <div class="stat-icon green">
+
+            <i class="fa-solid fa-clock"></i>
+
+        </div>
+
+        <div>
+
+            <h3 id="processingTime">0 s</h3>
+
+            <p>Processing Time</p>
+
+        </div>
+
+    </div>
+
+    <div class="stat-card">
+
+        <div class="stat-icon orange">
+
+            <i class="fa-solid fa-robot"></i>
+
+        </div>
+
+        <div>
+
+            <h3>Llama 3</h3>
+
+            <p>AI Model</p>
+
+        </div>
+
+    </div>
+
+</section>
+<section class="dashboard-grid">
+
+<div class="left-column">
+
+    <div class="card" id="upload">
+
+        <div class="card-header">
+
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+
+            <h2>Upload Documents</h2>
+
+        </div>
+
+        <label class="upload-area" for="pdfFiles">
+
+            <img
+                src="assets/upload.svg"
+                alt="Upload">
+
+            <h3>
+
+                Drag & Drop PDF Files
+
+            </h3>
+
+            <p>
+
+                Click here to browse
+
+            </p>
+
+        </label>
+
+        <input
+            type="file"
+            id="pdfFiles"
+            multiple
+            accept=".pdf"
+            hidden>
+
+        <button
+            id="uploadBtn"
+            class="primary-btn">
+
+            <i class="fa-solid fa-upload"></i>
+
+            Upload Documents
+
+        </button>
+
+        <div id="uploadStatus"></div>
+
+    </div>
+
+    <div class="card" id="summary">
+
+        <div class="card-header">
+
+            <i class="fa-solid fa-file-lines"></i>
+
+            <h2>Executive Summary</h2>
+
+        </div>
+
+        <div id="summaryBox">
+
+            <div class="welcome-box">
+
+                <h3>
+
+                    No Summary Generated
+
+                </h3>
+
+                <p>
+
+                    Upload PDF documents.
+
+                    The application will automatically
+
+                    process all documents and generate
+
+                    an executive summary.
+
+                </p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="card" id="process">
+
+        <div class="card-header">
+
+            <i class="fa-solid fa-gears"></i>
+
+            <h2>Processing Status</h2>
+
+        </div>
+
+        <p class="description">
+
+            Uploading →
+            OCR →
+            Chunking →
+            Embeddings →
+            ChromaDB →
+            BM25 →
+            AI Summary
+
+        </p>
+
+        <div id="processStatus">
+
+            Waiting for Upload...
+
+        </div>
+
+        <div class="progress-wrapper">
+
+            <div class="progress-bar">
+
+                <div id="progressFill"></div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <div class="card-header">
+
+            <i class="fa-solid fa-folder-open"></i>
+
+            <h2>Uploaded Documents</h2>
+
+        </div>
+
+        <div id="uploadedFiles">
+
+            <div class="empty-state">
+
+                <h3>
+
+                    No PDFs Uploaded
+
+                </h3>
+
+                <p>
+
+                    Uploaded documents will appear here.
+
+                </p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <div class="card-header">
+
+            <i class="fa-solid fa-lightbulb"></i>
+
+            <h2>Suggested Questions</h2>
+
+        </div>
+
+        <div class="feature-tags">
+
+            <span>Summarize all PDFs</span>
+
+            <span>Compare Documents</span>
+
+            <span>Explain Architecture</span>
+
+            <span>Technologies Used</span>
+
+            <span>Generate Report</span>
+
+            <span>Common Topics</span>
+
+        </div>
+
+    </div>
+
+</div>
+
+<div class="right-column">
+
+<div class="right-column">
+
+    <div class="card" id="chat">
+
+        <div class="card-header">
+
+            <i class="fa-solid fa-comments"></i>
+
+            <h2>AI Research Assistant</h2>
+
+        </div>
+
+        <p class="description">
+
+            Ask anything about your uploaded documents.
+            The AI answers only from the uploaded PDFs using
+            Hybrid Retrieval (ChromaDB + BM25).
+
+        </p>
+
+        <textarea
+
+            id="question"
+
+            placeholder="Examples:
+
+• Summarize all uploaded PDFs
+
+• Compare the uploaded documents
+
+• Explain the architecture
+
+• What technologies are used?
+
+• Generate an executive summary">
+
+        </textarea>
+
+        <div class="button-row">
+
+            <button
+
+                id="askBtn"
+
+                class="primary-btn">
+
+                <i class="fa-solid fa-paper-plane"></i>
+
+                Ask AI
+
+            </button>
+
+            <button
+
+                id="clearBtn"
+
+                class="danger-btn">
+
+                <i class="fa-solid fa-trash"></i>
+
+                Clear Chat
+
+            </button>
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <div class="card-header">
+
+            <i class="fa-solid fa-robot"></i>
+
+            <h2>AI Response</h2>
+
+        </div>
+
+        <div id="answer">
+
+            <div class="welcome-box">
+
+                <img
+                    src="assets/chatbot.svg"
+                    alt="AI">
+
+                <h2>
+
+                    🤖 Welcome to AI Research Assistant
+
+                </h2>
+
+                <p>
+
+                    Upload PDF documents.
+
+                    The application will automatically:
+
+                </p>
+
+                <ul style="text-align:left;line-height:2">
+
+                    <li>📄 Upload PDFs</li>
+
+                    <li>⚡ Process Documents</li>
+
+                    <li>🧠 Build AI Index</li>
+
+                    <li>📝 Generate Executive Summary</li>
+
+                    <li>💬 Answer Questions</li>
+
+                </ul>
+
+            </div>
+
+        </div>
+
+        <div class="answer-actions">
+
+            <button id="copyBtn">
+
+                <i class="fa-solid fa-copy"></i>
+
+                Copy
+
+            </button>
+
+            <button id="downloadBtn">
+
+                <i class="fa-solid fa-download"></i>
+
+                Download
+
+            </button>
+
+        </div>
+
+    </div>
+
+    <div class="card" id="sourcesSection">
+
+        <div class="card-header">
+
+            <i class="fa-solid fa-book-open"></i>
+
+            <h2>Retrieved Sources</h2>
+
+        </div>
+
+        <div id="sources">
+
+            <div class="empty-state">
+
+                <img
+
+                    src="assets/database.svg"
+
+                    alt="Sources">
+
+                <h3>
+
+                    No Sources Available
+
+                </h3>
+
+                <p>
+
+                    Retrieved document chunks
+
+                    will appear here after every answer.
+
+                </p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <div class="card-header">
+
+            <i class="fa-solid fa-clock-rotate-left"></i>
+
+            <h2>Recent Questions</h2>
+
+        </div>
+
+        <div id="chatHistory">
+
+            <div class="empty-state">
+
+                <h3>
+
+                    No Questions Yet
+
+                </h3>
+
+                <p>
+
+                    Your recent AI conversations
+
+                    will appear here.
+
+                </p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+</section>
+<!-- ========================= -->
+<!-- FEATURES -->
+<!-- ========================= -->
+
+<section class="feature-section">
+
+    <div class="feature-box">
+
+        <i class="fa-solid fa-file-circle-check"></i>
+
+        <h3>OCR Support</h3>
+
+        <p>
+
+            Automatically extracts text from scanned
+            and image-based PDF documents using EasyOCR.
+
+        </p>
+
+    </div>
+
+    <div class="feature-box">
+
+        <i class="fa-solid fa-brain"></i>
+
+        <h3>Semantic Search</h3>
+
+        <p>
+
+            Uses Sentence Transformers together with
+            ChromaDB for intelligent semantic retrieval.
+
+        </p>
+
+    </div>
+
+    <div class="feature-box">
+
+        <i class="fa-solid fa-magnifying-glass"></i>
+
+        <h3>Hybrid Retrieval</h3>
+
+        <p>
+
+            Combines BM25 keyword search and vector
+            similarity search for better accuracy.
+
+        </p>
+
+    </div>
+
+    <div class="feature-box">
+
+        <i class="fa-solid fa-robot"></i>
+
+        <h3>AI Answers</h3>
+
+        <p>
+
+            Generates answers using Ollama only from
+            uploaded PDF documents.
+
+        </p>
+
+    </div>
+
+</section>
+
+<!-- ========================= -->
+<!-- WORKFLOW -->
+<!-- ========================= -->
+
+<section class="workflow-section">
+
+    <div class="section-title">
+
+        <h2>
+
+            <i class="fa-solid fa-diagram-project"></i>
+
+            AI Processing Workflow
+
+        </h2>
+
+        <p>
+
+            Automatic Multi Document Pipeline
+
+        </p>
+
+    </div>
+
+    <div class="workflow">
+
+        <div class="workflow-card">
+
+            <i class="fa-solid fa-upload"></i>
+
+            <span>Upload</span>
+
+        </div>
+
+        <div class="workflow-arrow">
+
+            <i class="fa-solid fa-arrow-right"></i>
+
+        </div>
+
+        <div class="workflow-card">
+
+            <i class="fa-solid fa-file-lines"></i>
+
+            <span>OCR</span>
+
+        </div>
+
+        <div class="workflow-arrow">
+
+            <i class="fa-solid fa-arrow-right"></i>
+
+        </div>
+
+        <div class="workflow-card">
+
+            <i class="fa-solid fa-scissors"></i>
+
+            <span>Chunking</span>
+
+        </div>
+
+        <div class="workflow-arrow">
+
+            <i class="fa-solid fa-arrow-right"></i>
+
+        </div>
+
+        <div class="workflow-card">
+
+            <i class="fa-solid fa-brain"></i>
+
+            <span>Embeddings</span>
+
+        </div>
+
+        <div class="workflow-arrow">
+
+            <i class="fa-solid fa-arrow-right"></i>
+
+        </div>
+
+        <div class="workflow-card">
+
+            <i class="fa-solid fa-database"></i>
+
+            <span>ChromaDB</span>
+
+        </div>
+
+        <div class="workflow-arrow">
+
+            <i class="fa-solid fa-arrow-right"></i>
+
+        </div>
+
+        <div class="workflow-card">
+
+            <i class="fa-solid fa-layer-group"></i>
+
+            <span>BM25</span>
+
+        </div>
+
+        <div class="workflow-arrow">
+
+            <i class="fa-solid fa-arrow-right"></i>
+
+        </div>
+
+        <div class="workflow-card">
+
+            <i class="fa-solid fa-robot"></i>
+
+            <span>Ollama</span>
+
+        </div>
+
+        <div class="workflow-arrow">
+
+            <i class="fa-solid fa-arrow-right"></i>
+
+        </div>
+
+        <div class="workflow-card">
+
+            <i class="fa-solid fa-file-lines"></i>
+
+            <span>Summary</span>
+
+        </div>
+
+    </div>
+
+</section>
+
+<!-- ========================= -->
+<!-- TECHNOLOGY -->
+<!-- ========================= -->
+
+<section class="technology-section">
+
+    <div class="section-title">
+
+        <h2>
+
+            Technology Stack
+
+        </h2>
+
+    </div>
+
+    <div class="technology-grid">
+
+        <div class="technology-card">
+
+            <i class="fa-brands fa-python"></i>
+
+            <h3>Python</h3>
+
+        </div>
+
+        <div class="technology-card">
+
+            <i class="fa-solid fa-bolt"></i>
+
+            <h3>FastAPI</h3>
+
+        </div>
+
+        <div class="technology-card">
+
+            <i class="fa-solid fa-database"></i>
+
+            <h3>ChromaDB</h3>
+
+        </div>
+
+        <div class="technology-card">
+
+            <i class="fa-solid fa-layer-group"></i>
+
+            <h3>BM25</h3>
+
+        </div>
+
+        <div class="technology-card">
+
+            <i class="fa-solid fa-brain"></i>
+
+            <h3>Sentence Transformers</h3>
+
+        </div>
+
+        <div class="technology-card">
+
+            <i class="fa-solid fa-robot"></i>
+
+            <h3>Ollama</h3>
+
+        </div>
+
+        <div class="technology-card">
+
+            <i class="fa-solid fa-eye"></i>
+
+            <h3>EasyOCR</h3>
+
+        </div>
+
+        <div class="technology-card">
+
+            <i class="fa-brands fa-js"></i>
+
+            <h3>JavaScript</h3>
+
+        </div>
+
+    </div>
+
+</section>
+
+<!-- ========================= -->
+<!-- FOOTER -->
+<!-- ========================= -->
+
+<footer>
+
+    <div class="footer-content">
+
+        <div>
+
+            <h3>
+
+                AI Research Assistant
+
+            </h3>
+
+            <p>
+
+                Multi Document Research Summarizer
+
+            </p>
+
+        </div>
+
+        <div>
+
+            <p>
+
+                FastAPI • ChromaDB • BM25 • Ollama • EasyOCR
+
+            </p>
+
+        </div>
+
+    </div>
+
+    <hr>
+
+    <p>
+
+        © 2026 AI Research Assistant | Final Year Project
+
+    </p>
+
+</footer>
+
+</div>
+
+<!-- ========================= -->
+<!-- LOADING -->
+<!-- ========================= -->
+
+<div
+id="loadingModal"
+class="loading-modal">
+
+    <div class="loading-content">
+
+        <div class="loader"></div>
+
+        <h2>
+
+            AI is Processing...
+
+        </h2>
+
+        <p>
+
+            Uploading • Processing • Generating Summary
+
+        </p>
+
+    </div>
+
+</div>
+
+<div id="toast"></div>
+
+<button id="scrollTop">
+
+    <i class="fa-solid fa-arrow-up"></i>
+
+</button>
+
+<script src="script.js" defer></script>
+
+</body>
+
+</html>
+
