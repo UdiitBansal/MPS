@@ -1,8 +1,9 @@
-from pydantic import BaseModel
 from fastapi import APIRouter
+from pydantic import BaseModel
 
 from backend.services.retriever import Retriever
 from backend.services.ollama_service import OllamaService
+
 
 router = APIRouter(
     prefix="/chat",
@@ -22,37 +23,101 @@ def chat(request: ChatRequest):
 
     question = request.question.strip()
 
-    if question == "":
+    if not question:
+
         return {
             "status": "error",
             "question": "",
             "answer": "Please enter a question.",
-            "sources": []
+            "sources": [],
+            "retrieved_chunks": 0,
+            "total_sources": 0
         }
 
-    chunks = retriever.search(question)
+    retrieved_chunks = retriever.search(question)
 
-    if len(chunks) == 0:
+    if not retrieved_chunks:
+
         return {
             "status": "error",
             "question": question,
             "answer": "I could not find the answer in the uploaded documents.",
-            "sources": []
+            "sources": [],
+            "retrieved_chunks": 0,
+            "total_sources": 0
         }
 
-    context = ""
+    context_parts = []
 
-    for index, chunk in enumerate(chunks, start=1):
+    source_list = []
 
-        context += f"""
+    for i, item in enumerate(retrieved_chunks, start=1):
 
-==============================
-Context {index}
-==============================
+        if isinstance(item, dict):
 
-{chunk}
+            pdf = item.get("source", "Unknown")
 
+            page = item.get("page", "-")
+
+            chunk = item.get("chunk", "-")
+
+            score = item.get("score", 0)
+
+            text = item.get("text", "").strip()
+
+            context_parts.append(
+                f"""
+==================================================
+DOCUMENT {i}
+==================================================
+
+PDF: {pdf}
+Page: {page}
+Chunk: {chunk}
+
+{text}
 """
+            )
+
+            source_list.append({
+
+                "source": pdf,
+
+                "page": page,
+
+                "chunk": chunk,
+
+                "score": score
+
+            })
+
+        else:
+
+            text = str(item).strip()
+
+            context_parts.append(
+                f"""
+==================================================
+DOCUMENT {i}
+==================================================
+
+{text}
+"""
+            )
+
+            source_list.append({
+
+                "source": "Unknown",
+
+                "page": "-",
+
+                "chunk": i,
+
+                "score": 0
+
+            })
+
+    context = "\n".join(context_parts)
 
     answer = ollama.generate(
         question,
@@ -60,9 +125,17 @@ Context {index}
     )
 
     return {
+
         "status": "success",
+
         "question": question,
+
         "answer": answer,
-        "sources": chunks,
-        "total_sources": len(chunks)
+
+        "sources": source_list,
+
+        "retrieved_chunks": len(retrieved_chunks),
+
+        "total_sources": len(source_list)
+
     }

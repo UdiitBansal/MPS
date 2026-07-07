@@ -1,7 +1,11 @@
-from sentence_transformers import SentenceTransformer
 import numpy as np
+from sentence_transformers import SentenceTransformer
 
-from backend.config import EMBEDDING_MODEL
+from backend.config import (
+    EMBEDDING_MODEL,
+    EMBEDDING_BATCH_SIZE,
+    NORMALIZE_EMBEDDINGS
+)
 
 
 class EmbeddingModel:
@@ -11,7 +15,12 @@ class EmbeddingModel:
         print("\nLoading Embedding Model...")
 
         self.model = SentenceTransformer(
-            EMBEDDING_MODEL
+            EMBEDDING_MODEL,
+            device="cpu"
+        )
+
+        self.embedding_dimension = (
+            self.model.get_sentence_embedding_dimension()
         )
 
         print("Embedding Model Loaded Successfully.\n")
@@ -19,7 +28,6 @@ class EmbeddingModel:
     def encode(self, texts):
 
         if isinstance(texts, str):
-
             texts = [texts]
 
         texts = [
@@ -32,19 +40,18 @@ class EmbeddingModel:
 
         ]
 
-        if len(texts) == 0:
-
+        if not texts:
             return np.array([])
 
         embeddings = self.model.encode(
 
             texts,
 
-            batch_size=32,
+            batch_size=EMBEDDING_BATCH_SIZE,
 
             convert_to_numpy=True,
 
-            normalize_embeddings=True,
+            normalize_embeddings=NORMALIZE_EMBEDDINGS,
 
             show_progress_bar=False
 
@@ -56,18 +63,18 @@ class EmbeddingModel:
 
         embedding = self.model.encode(
 
-            [query],
+            query,
 
             convert_to_numpy=True,
 
-            normalize_embeddings=True,
+            normalize_embeddings=NORMALIZE_EMBEDDINGS,
 
             show_progress_bar=False
 
         )
 
-        return embedding[0]
+        return embedding
 
     def dimension(self):
 
-        return self.model.get_sentence_embedding_dimension()
+        return self.embedding_dimension

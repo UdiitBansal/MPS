@@ -1,20 +1,38 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.config import OLLAMA_MODEL
+from backend.config import (
+    APP_NAME,
+    APP_VERSION,
+    PROJECT_NAME,
+    AUTHOR,
+    OLLAMA_MODEL
+)
+
 from backend.routes.upload import router as upload_router
 from backend.routes.process import router as process_router
 from backend.routes.chat import router as chat_router
 
+
 app = FastAPI(
 
-    title="AI Research Assistant",
+    title=APP_NAME,
 
-    description="Multi PDF Research Summarizer using FastAPI, ChromaDB, BM25 and Ollama",
+    version=APP_VERSION,
 
-    version="2.0.0"
+    description="High-Speed Multi PDF Research Summarizer using FastAPI, ChromaDB, BM25 and Ollama.",
+
+    contact={
+
+        "name": AUTHOR
+
+    }
 
 )
+
+# ==========================================================
+# CORS
+# ==========================================================
 
 app.add_middleware(
 
@@ -30,10 +48,19 @@ app.add_middleware(
 
 )
 
+# ==========================================================
+# ROUTES
+# ==========================================================
+
 app.include_router(upload_router)
+
 app.include_router(process_router)
+
 app.include_router(chat_router)
 
+# ==========================================================
+# HOME
+# ==========================================================
 
 @app.get("/")
 def home():
@@ -42,9 +69,13 @@ def home():
 
         "status": "running",
 
-        "application": "AI Research Assistant",
+        "application": APP_NAME,
 
-        "version": "2.0.0",
+        "project": PROJECT_NAME,
+
+        "version": APP_VERSION,
+
+        "author": AUTHOR,
 
         "model": OLLAMA_MODEL,
 
@@ -52,7 +83,9 @@ def home():
 
             "Multi PDF Upload",
 
-            "Automatic Processing",
+            "OCR Extraction",
+
+            "Parallel PDF Processing",
 
             "Hybrid Retrieval",
 
@@ -62,12 +95,18 @@ def home():
 
             "Executive Summary",
 
-            "Question Answering"
+            "Question Answering",
+
+            "Research Report Generation"
 
         ]
 
     }
 
+
+# ==========================================================
+# HEALTH
+# ==========================================================
 
 @app.get("/health")
 def health():
@@ -78,30 +117,40 @@ def health():
 
         "backend": "online",
 
-        "ollama_model": OLLAMA_MODEL
+        "model": OLLAMA_MODEL
 
     }
 
+
+# ==========================================================
+# ABOUT
+# ==========================================================
 
 @app.get("/about")
 def about():
 
     return {
 
-        "project": "Multi PDF Research Summarizer",
+        "project": PROJECT_NAME,
 
         "backend": "FastAPI",
 
         "vector_database": "ChromaDB",
 
-        "retrieval": "Hybrid (Semantic + BM25)",
+        "retrieval": "Hybrid Retrieval",
+
+        "embedding_model": "BAAI/bge-small-en-v1.5",
 
         "llm": OLLAMA_MODEL,
 
-        "version": "2.0.0"
+        "version": APP_VERSION
 
     }
 
+
+# ==========================================================
+# PING
+# ==========================================================
 
 @app.get("/ping")
 def ping():

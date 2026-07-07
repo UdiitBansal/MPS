@@ -1,27 +1,28 @@
-from backend.services.hybrid_retriever import HybridRetriever
 from backend.indexes.document_index import index
+from backend.services.hybrid_retriever import HybridRetriever
+
+from backend.config import (
+    DEFAULT_TOP_K,
+    SUMMARY_TOP_K,
+    COMPARE_TOP_K
+)
 
 
 class Retriever:
 
     def __init__(self):
 
-        self.retriever = HybridRetriever(
+        self.hybrid = HybridRetriever(
+
             chroma=index.chroma,
+
             bm25=index.bm25,
+
             embedder=index.embedder
+
         )
 
-    def search(self, question):
-
-        question = question.strip()
-
-        if not question:
-            return []
-
-        q = question.lower()
-
-        summary_keywords = [
+        self.summary_keywords = {
 
             "summary",
             "summarize",
@@ -30,15 +31,15 @@ class Retriever:
             "overall summary",
             "complete summary",
             "summary of all",
+            "research report",
+            "report",
             "all pdf",
             "all pdfs",
-            "all documents",
-            "research report",
-            "report"
+            "all documents"
 
-        ]
+        }
 
-        compare_keywords = [
+        self.compare_keywords = {
 
             "compare",
             "comparison",
@@ -46,15 +47,15 @@ class Retriever:
             "differences",
             "similarity",
             "similarities",
+            "contrast",
             "common",
             "common topics",
             "same",
-            "unique",
-            "contrast"
+            "unique"
 
-        ]
+        }
 
-        detailed_keywords = [
+        self.detail_keywords = {
 
             "architecture",
             "design",
@@ -63,29 +64,49 @@ class Retriever:
             "methodology",
             "algorithm",
             "framework",
-            "system",
             "pipeline",
-            "component"
+            "system",
+            "component",
+            "technology",
+            "modules",
+            "model",
+            "retrieval",
+            "embedding"
 
-        ]
+        }
 
-        if any(keyword in q for keyword in summary_keywords):
+    def detect_top_k(self, question):
 
-            top_k = 35
+        q = question.lower()
 
-        elif any(keyword in q for keyword in compare_keywords):
+        if any(keyword in q for keyword in self.summary_keywords):
 
-            top_k = 30
+            return SUMMARY_TOP_K
 
-        elif any(keyword in q for keyword in detailed_keywords):
+        if any(keyword in q for keyword in self.compare_keywords):
 
-            top_k = 20
+            return COMPARE_TOP_K
 
-        else:
+        if any(keyword in q for keyword in self.detail_keywords):
 
-            top_k = 10
+            return 20
 
-        return self.retriever.retrieve(
+        return DEFAULT_TOP_K
+
+    def search(self, question):
+
+        question = question.strip()
+
+        if not question:
+
+            return []
+
+        top_k = self.detect_top_k(question)
+
+        return self.hybrid.retrieve(
+
             question,
+
             top_k=top_k
+
         )

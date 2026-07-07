@@ -1,6 +1,9 @@
 import fitz
 import easyocr
 import numpy as np
+from concurrent.futures import ThreadPoolExecutor
+
+from backend.config import OCR_DPI, MAX_WORKERS
 
 
 class PDFReader:
@@ -15,69 +18,99 @@ class PDFReader:
     print("EasyOCR Ready.\n")
 
     @staticmethod
+    def process_page(page_data):
+
+        page_number, page = page_data
+
+        text = page.get_text("text").strip()
+
+        if text:
+
+            print(
+                f"✓ Page {page_number} : Text Extracted ({len(text)} chars)"
+            )
+
+            return page_number, text
+
+        print(
+            f"Page {page_number} : Running OCR..."
+        )
+
+        pix = page.get_pixmap(
+            dpi=OCR_DPI
+        )
+
+        image = np.frombuffer(
+            pix.samples,
+            dtype=np.uint8
+        ).reshape(
+            pix.height,
+            pix.width,
+            pix.n
+        )
+
+        result = PDFReader.reader.readtext(
+            image,
+            detail=0,
+            paragraph=True
+        )
+
+        ocr_text = "\n".join(result)
+
+        print(
+            f"✓ Page {page_number} : OCR ({len(ocr_text)} chars)"
+        )
+
+        return page_number, ocr_text
+
+    @staticmethod
     def read_pdf(pdf_path):
 
         print(f"\nOpening PDF : {pdf_path}")
 
         document = fitz.open(pdf_path)
 
-        extracted_text = []
-
         total_pages = len(document)
 
         print(f"Total Pages : {total_pages}")
 
-        for page_number, page in enumerate(document, start=1):
+        pages = [
 
-            print(f"Reading Page {page_number}...")
+            (i + 1, document.load_page(i))
 
-            text = page.get_text("text")
+            for i in range(total_pages)
 
-            if text.strip():
+        ]
 
-                print(
-                    f"✓ Text Extracted ({len(text)} characters)"
+        with ThreadPoolExecutor(
+            max_workers=MAX_WORKERS
+        ) as executor:
+
+            results = list(
+                executor.map(
+                    PDFReader.process_page,
+                    pages
                 )
-
-                extracted_text.append(text)
-
-                continue
-
-            print("No selectable text found. Running OCR...")
-
-            pix = page.get_pixmap(
-                dpi=300
             )
-
-            image = np.frombuffer(
-                pix.samples,
-                dtype=np.uint8
-            ).reshape(
-                pix.height,
-                pix.width,
-                pix.n
-            )
-
-            result = PDFReader.reader.readtext(
-                image,
-                detail=0,
-                paragraph=True
-            )
-
-            ocr_text = "\n".join(result)
-
-            print(
-                f"✓ OCR Extracted ({len(ocr_text)} characters)"
-            )
-
-            extracted_text.append(ocr_text)
 
         document.close()
 
-        final_text = "\n\n".join(extracted_text).strip()
+        results.sort(
+            key=lambda x: x[0]
+        )
+
+        final_text = "\n\n".join(
+
+            text
+
+            for _, text in results
+
+            if text.strip()
+
+        )
 
         print(
             f"\nTotal Characters Extracted : {len(final_text)}"
         )
 
-        return final_text
+        return final_text.strip()

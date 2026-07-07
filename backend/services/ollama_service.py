@@ -1,121 +1,144 @@
 import requests
 
-from backend.config import OLLAMA_MODEL
+from backend.config import (
+    OLLAMA_HOST,
+    OLLAMA_MODEL,
+    OLLAMA_TIMEOUT,
+    TEMPERATURE,
+    TOP_P,
+    TOP_K,
+    REPEAT_PENALTY,
+    MAX_TOKENS
+)
 
 
 class OllamaService:
 
     def __init__(self):
 
-        self.url = "http://localhost:11434/api/generate"
+        self.url = f"{OLLAMA_HOST}/api/generate"
 
     def generate(self, question, context):
 
-        question_lower = question.lower()
+        q = question.lower()
 
-        if any(keyword in question_lower for keyword in [
+        # ---------------- SUMMARY ----------------
+
+        if any(word in q for word in [
 
             "summary",
             "summarize",
             "summarise",
-            "summary of all",
-            "all pdf",
-            "all pdfs",
-            "all documents",
             "overall summary",
-            "complete",
-            "entire",
-            "whole",
-            "full",
+            "executive summary",
+            "all pdf",
+            "all documents",
             "research report"
 
         ]):
 
             instructions = """
-You are an AI Research Assistant.
-
-Answer ONLY using the provided context.
+Generate a document-wise summary.
 
 Rules:
 
-1. Generate a document-wise summary.
-2. Create a heading for each document.
-3. Summarize each document in bullet points.
-4. Do NOT mix information from different documents.
-5. Ignore duplicate information.
-6. End with an Overall Summary.
-7. Never invent information.
-8. Never use outside knowledge.
-9. If information is unavailable, say so.
+- Treat every PDF separately.
+- Use the PDF name as the heading.
+- Summarize only that PDF.
+- Never mix documents.
+- Use concise bullet points.
+- Remove duplicate information.
+- End with a short Overall Summary.
+- Use ONLY the supplied context.
 """
 
-        elif any(keyword in question_lower for keyword in [
+        # ---------------- COMPARISON ----------------
+
+        elif any(word in q for word in [
 
             "compare",
             "comparison",
             "difference",
             "differences",
+            "similarity",
             "common",
-            "similar",
             "contrast"
 
         ]):
 
             instructions = """
-You are an AI Research Assistant.
-
-Answer ONLY using the provided context.
+Compare the uploaded documents.
 
 Rules:
 
-1. Compare the uploaded documents.
-2. Show similarities.
-3. Show differences.
-4. Mention document names whenever possible.
-5. Use headings and bullet points.
-6. Do NOT invent information.
-7. Ignore unrelated context.
+- Mention every PDF separately.
+- Show similarities.
+- Show differences.
+- Use a markdown table whenever appropriate.
+- End with a conclusion.
+- Use ONLY the supplied context.
 """
+
+        # ---------------- NORMAL QA ----------------
 
         else:
 
             instructions = """
-You are an AI Research Assistant.
-
-Answer ONLY using the provided context.
+Answer ONLY from the supplied context.
 
 Rules:
 
-1. First give a direct answer.
-2. Then explain the answer.
-3. Use headings.
-4. Use bullet points whenever useful.
-5. Keep the answer concise and readable.
-6. Do not repeat sentences.
-7. Do not use outside knowledge.
-8. If the answer is not found in the uploaded documents, reply:
+- Give the answer first.
+- Then explain briefly.
+- Use headings and bullets.
+- Combine information naturally.
+- Do not repeat sentences.
+- Ignore duplicate chunks.
+- Do NOT mention:
+    - Chunk number
+    - Relevance score
+    - Context number
+- Never invent information.
+- If the answer is unavailable reply exactly:
 
-'I could not find the answer in the uploaded documents.'
+I could not find the answer in the uploaded documents.
 """
 
         prompt = f"""
-{instructions}
+You are an AI Research Assistant.
 
-==========================================
+You MUST answer ONLY from the supplied context.
+
+Never use outside knowledge.
+
+Never hallucinate.
+
+Never mention chunk numbers,
+document numbers,
+retrieval scores,
+or internal metadata.
+
+==========================
 CONTEXT
-==========================================
+==========================
 
 {context}
 
-==========================================
+==========================
 QUESTION
-==========================================
+==========================
 
 {question}
 
-==========================================
+==========================
+INSTRUCTIONS
+==========================
+
+{instructions}
+
+==========================
 ANSWER
-==========================================
+==========================
 """
 
         response = requests.post(
@@ -132,26 +155,24 @@ ANSWER
 
                 "options": {
 
-                    "temperature": 0.1,
+                    "temperature": TEMPERATURE,
 
-                    "top_p": 0.9,
+                    "top_p": TOP_P,
 
-                    "top_k": 40,
+                    "top_k": TOP_K,
 
-                    "repeat_penalty": 1.15,
+                    "repeat_penalty": REPEAT_PENALTY,
 
-                    "num_predict": 1024
+                    "num_predict": MAX_TOKENS
 
                 }
 
             },
 
-            timeout=300
+            timeout=OLLAMA_TIMEOUT
 
         )
 
         response.raise_for_status()
 
-        answer = response.json()["response"].strip()
-
-        return answer
+        return response.json()["response"].strip()

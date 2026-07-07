@@ -1,7 +1,13 @@
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 import time
+import fitz
 
-from backend.config import UPLOAD_DIR
+from backend.config import (
+    UPLOAD_DIR,
+    MAX_WORKERS
+)
+
 from backend.services.pdf_reader import PDFReader
 from backend.services.chunker import Chunker
 from backend.services.embeddings import EmbeddingModel
@@ -21,55 +27,132 @@ class DocumentIndex:
 
         self.all_chunks = []
 
+        self.metadata = []
+
+    def process_pdf(self, pdf):
+
+        print(f"\nReading : {pdf.name}")
+
+        text = PDFReader.read_pdf(str(pdf))
+
+        if not text:
+
+            return [], [], 0
+
+        # Get actual page count
+        with fitz.open(str(pdf)) as doc:
+
+            actual_pages = len(doc)
+
+        chunks = Chunker.split(text)
+
+        pdf_chunks = []
+
+        pdf_metadata = []
+
+        for i, chunk in enumerate(chunks, start=1):
+
+            chunk = chunk.strip()
+
+            if not chunk:
+                continue
+
+            pdf_chunks.append(chunk)
+
+            pdf_metadata.append(
+
+                {
+
+                    "source": pdf.name,
+
+                    "page": "-",
+
+                    "chunk": i
+
+                }
+
+            )
+
+        return (
+
+            pdf_chunks,
+
+            pdf_metadata,
+
+            actual_pages
+
+        )
+
     def build(self):
 
         start_time = time.time()
 
         self.all_chunks.clear()
 
-        pdfs = sorted(Path(UPLOAD_DIR).glob("*.pdf"))
+        self.metadata.clear()
 
-        if not pdfs:
+        pdf_files = sorted(
+
+            Path(UPLOAD_DIR).glob("*.pdf")
+
+        )
+
+        if len(pdf_files) == 0:
 
             return {
+
                 "status": "error",
+
                 "message": "No PDF files found."
+
             }
 
         total_pages = 0
 
-        for pdf in pdfs:
+        print("\nProcessing PDFs in Parallel...\n")
 
-            print(f"\nReading : {pdf.name}")
+        with ThreadPoolExecutor(
 
-            text = PDFReader.read_pdf(str(pdf))
+            max_workers=MAX_WORKERS
 
-            if not text:
-                continue
+        ) as executor:
 
-            total_pages += text.count("\n") + 1
+            results = list(
 
-            chunks = Chunker.split(text)
+                executor.map(
 
-            for chunk in chunks:
+                    self.process_pdf,
 
-                chunk = chunk.strip()
+                    pdf_files
 
-                if chunk:
+                )
 
-                    self.all_chunks.append(chunk)
+            )
+
+        for chunks, metadata, pages in results:
+
+            self.all_chunks.extend(chunks)
+
+            self.metadata.extend(metadata)
+
+            total_pages += pages
 
         if len(self.all_chunks) == 0:
 
             return {
+
                 "status": "error",
-                "message": "No text extracted from uploaded PDFs."
+
+                "message": "No text extracted."
+
             }
 
         print("\nGenerating Embeddings...")
 
         embeddings = self.embedder.encode(
+
             self.all_chunks
+
         )
 
         print("Resetting ChromaDB...")
@@ -79,21 +162,31 @@ class DocumentIndex:
         print("Saving Embeddings...")
 
         self.chroma.add_documents(
+
             self.all_chunks,
-            embeddings
+
+            embeddings,
+
+            self.metadata
+
         )
 
-        print("Building BM25 Index...")
+        print("Building BM25...")
 
         self.bm25.build_index(
-            self.all_chunks
+
+            self.all_chunks,
+
+            self.metadata
+
         )
 
-        end_time = time.time()
-
         processing_time = round(
-            end_time - start_time,
+
+            time.time() - start_time,
+
             2
+
         )
 
         return {
@@ -102,13 +195,13 @@ class DocumentIndex:
 
             "message": "Documents processed successfully.",
 
-            "documents": len(pdfs),
+            "documents": len(pdf_files),
 
             "pages": total_pages,
 
             "chunks": len(self.all_chunks),
 
-            "embedding_dimension": len(embeddings[0]),
+            "embedding_dimension": self.embedder.dimension(),
 
             "processing_time": processing_time
 

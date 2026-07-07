@@ -7,23 +7,48 @@ class BM25Store:
 
         self.documents = []
 
+        self.metadata = []
+
         self.tokenized_docs = []
 
         self.bm25 = None
 
-    def build_index(self, chunks):
+    def build_index(self, chunks, metadata_list=None):
+
+        self.clear()
+
+        if not chunks:
+            return
 
         self.documents = chunks
 
-        self.tokenized_docs = [
-            chunk.lower().split()
-            for chunk in chunks
-            if chunk.strip()
-        ]
+        if metadata_list is None:
 
-        if len(self.tokenized_docs) == 0:
-            self.bm25 = None
-            return
+            metadata_list = [
+
+                {
+
+                    "source": "Unknown",
+
+                    "chunk": i + 1,
+
+                    "page": "-"
+
+                }
+
+                for i in range(len(chunks))
+
+            ]
+
+        self.metadata = metadata_list
+
+        self.tokenized_docs = [
+
+            doc.lower().split()
+
+            for doc in self.documents
+
+        ]
 
         self.bm25 = BM25Okapi(
             self.tokenized_docs
@@ -32,21 +57,86 @@ class BM25Store:
     def search(self, query, top_k=10):
 
         if self.bm25 is None:
+
             return []
 
-        query_tokens = query.lower().split()
+        query = query.strip().lower()
+
+        if not query:
+
+            return []
+
+        query_tokens = query.split()
 
         scores = self.bm25.get_scores(
             query_tokens
         )
 
         ranked = sorted(
-            zip(self.documents, scores),
-            key=lambda x: x[1],
+
+            zip(
+
+                self.documents,
+
+                self.metadata,
+
+                scores
+
+            ),
+
+            key=lambda x: x[2],
+
             reverse=True
+
         )
 
-        return ranked[:top_k]
+        results = []
+
+        for doc, meta, score in ranked[:top_k]:
+
+            results.append(
+
+                {
+
+                    "text": doc,
+
+                    "source": meta.get(
+
+                        "source",
+
+                        "Unknown"
+
+                    ),
+
+                    "chunk": meta.get(
+
+                        "chunk",
+
+                        0
+
+                    ),
+
+                    "page": meta.get(
+
+                        "page",
+
+                        "-"
+
+                    ),
+
+                    "score": round(
+
+                        float(score),
+
+                        4
+
+                    )
+
+                }
+
+            )
+
+        return results
 
     def get_all_documents(self):
 
@@ -59,6 +149,8 @@ class BM25Store:
     def clear(self):
 
         self.documents = []
+
+        self.metadata = []
 
         self.tokenized_docs = []
 

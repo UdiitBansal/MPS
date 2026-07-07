@@ -6,7 +6,9 @@ class HybridRetriever:
     def __init__(self, chroma, bm25, embedder):
 
         self.chroma = chroma
+
         self.bm25 = bm25
+
         self.embedder = embedder
 
     def retrieve(self, query, top_k=10):
@@ -14,76 +16,99 @@ class HybridRetriever:
         query = query.strip()
 
         if not query:
+
             return []
 
-        q = query.lower()
+        # ---------------- Query Embedding ----------------
 
-        if any(keyword in q for keyword in [
-            "summary",
-            "summarize",
-            "summarise",
-            "all pdf",
-            "all documents",
-            "overall summary",
-            "compare",
-            "comparison",
-            "difference",
-            "differences",
-            "common",
-            "similar",
-            "research report"
-        ]):
-
-            top_k = 30
-
-        query_embedding = self.embedder.encode(
-            [query]
-        )[0]
-
-        chroma_results = self.chroma.search(
-            query_embedding,
-            top_k
+        query_embedding = self.embedder.encode_query(
+            query
         )
 
-        bm25_results = self.bm25.search(
+        # ---------------- Semantic Search ----------------
+
+        semantic_results = self.chroma.search(
+            query_embedding,
+            top_k * 2
+        )
+
+        # ---------------- Keyword Search ----------------
+
+        keyword_results = self.bm25.search(
             query,
-            top_k
+            top_k * 2
         )
 
         scores = defaultdict(float)
 
-        for rank, doc in enumerate(chroma_results):
+        documents = {}
 
-            scores[doc] += 1 / (rank + 60)
+        # ==================================================
+        # Chroma Score (Higher Weight)
+        # ==================================================
 
-        for rank, (doc, score) in enumerate(bm25_results):
+        for rank, item in enumerate(semantic_results):
 
-            scores[doc] += (1 / (rank + 60)) + (score * 0.01)
+            text = item["text"]
+
+            documents[text] = item
+
+            semantic_score = 1 / (rank + 1)
+
+            scores[text] += semantic_score * 0.75
+
+        # ==================================================
+        # BM25 Score
+        # ==================================================
+
+        for rank, item in enumerate(keyword_results):
+
+            text = item["text"]
+
+            documents[text] = item
+
+            keyword_rank = 1 / (rank + 1)
+
+            scores[text] += keyword_rank * 0.25
+
+            scores[text] += item["score"] * 0.015
+
+        # ==================================================
+        # Final Ranking
+        # ==================================================
 
         ranked = sorted(
+
             scores.items(),
+
             key=lambda x: x[1],
+
             reverse=True
+
         )
 
-        results = []
+        final_results = []
+
         seen = set()
 
-        for doc, score in ranked:
+        for text, score in ranked:
 
-            doc = doc.strip()
+            normalized = " ".join(text.split())
 
-            if not doc:
+            if normalized in seen:
+
                 continue
 
-            if doc in seen:
-                continue
+            seen.add(normalized)
 
-            seen.add(doc)
+            doc = documents[text]
 
-            results.append(doc)
+            doc["score"] = round(score, 4)
 
-            if len(results) >= top_k:
+            final_results.append(doc)
+
+            if len(final_results) >= top_k:
+
                 break
 
-        return results
+        return final_results
