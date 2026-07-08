@@ -1,18 +1,63 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
+
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config import (
+
     APP_NAME,
+
     APP_VERSION,
+
     PROJECT_NAME,
+
     AUTHOR,
-    OLLAMA_MODEL
+
+    OLLAMA_MODEL,
+
+    EMBEDDING_MODEL,
+
+    ALLOWED_ORIGINS
+
 )
 
 from backend.routes.upload import router as upload_router
+
 from backend.routes.process import router as process_router
+
 from backend.routes.chat import router as chat_router
 
+
+# ==========================================================
+# APPLICATION LIFECYCLE
+# ==========================================================
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+
+    print("\n======================================")
+
+    print(f"{APP_NAME}")
+
+    print(f"Version : {APP_VERSION}")
+
+    print(f"Model   : {OLLAMA_MODEL}")
+
+    print(f"Embedding Model : {EMBEDDING_MODEL}")
+
+    print("Backend Started Successfully")
+
+    print("======================================\n")
+
+    yield
+
+    print("\nBackend Shutdown Successfully\n")
+
+
+# ==========================================================
+# FASTAPI
+# ==========================================================
 
 app = FastAPI(
 
@@ -20,13 +65,43 @@ app = FastAPI(
 
     version=APP_VERSION,
 
-    description="High-Speed Multi PDF Research Summarizer using FastAPI, ChromaDB, BM25 and Ollama.",
+    description="High-Speed Multi PDF Research Summarizer using FastAPI, ChromaDB, BM25, EasyOCR and Ollama.",
 
     contact={
 
         "name": AUTHOR
 
-    }
+    },
+
+    lifespan=lifespan,
+
+    openapi_tags=[
+
+        {
+
+            "name": "Upload",
+
+            "description": "Upload PDF Documents"
+
+        },
+
+        {
+
+            "name": "Processing",
+
+            "description": "Generate Embeddings & Index"
+
+        },
+
+        {
+
+            "name": "Chat",
+
+            "description": "Question Answering"
+
+        }
+
+    ]
 
 )
 
@@ -38,7 +113,7 @@ app.add_middleware(
 
     CORSMiddleware,
 
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
 
     allow_credentials=True,
 
@@ -79,13 +154,15 @@ def home():
 
         "model": OLLAMA_MODEL,
 
+        "embedding_model": EMBEDDING_MODEL,
+
         "features": [
 
             "Multi PDF Upload",
 
             "OCR Extraction",
 
-            "Parallel PDF Processing",
+            "Parallel Processing",
 
             "Hybrid Retrieval",
 
@@ -99,10 +176,23 @@ def home():
 
             "Research Report Generation"
 
+        ],
+
+        "endpoints": [
+
+            "/upload",
+
+            "/process",
+
+            "/chat",
+
+            "/health",
+
+            "/about"
+
         ]
 
     }
-
 
 # ==========================================================
 # HEALTH
@@ -117,10 +207,11 @@ def health():
 
         "backend": "online",
 
-        "model": OLLAMA_MODEL
+        "model": OLLAMA_MODEL,
+
+        "embedding_model": EMBEDDING_MODEL
 
     }
-
 
 # ==========================================================
 # ABOUT
@@ -139,14 +230,15 @@ def about():
 
         "retrieval": "Hybrid Retrieval",
 
-        "embedding_model": "BAAI/bge-small-en-v1.5",
+        "embedding_model": EMBEDDING_MODEL,
 
         "llm": OLLAMA_MODEL,
 
-        "version": APP_VERSION
+        "version": APP_VERSION,
+
+        "author": AUTHOR
 
     }
-
 
 # ==========================================================
 # PING
@@ -157,6 +249,8 @@ def ping():
 
     return {
 
-        "message": "Backend Connected Successfully"
+        "message": "Backend Connected Successfully",
+
+        "status": "OK"
 
     }

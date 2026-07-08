@@ -40,6 +40,8 @@ class Chunker:
 
     )
 
+    MIN_CHUNK_LENGTH = 50
+
     @classmethod
     def split(cls, text):
 
@@ -47,22 +49,41 @@ class Chunker:
 
             return []
 
-        text = text.strip()
+        text = " ".join(text.split())
 
         if not text:
 
             return []
 
-        chunks = cls.splitter.split_text(text)
+        raw_chunks = cls.splitter.split_text(text)
 
         cleaned_chunks = []
 
-        for chunk in chunks:
+        seen = set()
 
-            chunk = " ".join(chunk.split())
+        for chunk in raw_chunks:
 
-            if len(chunk) >= 50:
+            chunk = " ".join(chunk.split()).strip()
 
-                cleaned_chunks.append(chunk)
+            if len(chunk) < cls.MIN_CHUNK_LENGTH:
+
+                continue
+
+            # Skip chunks containing only numbers/symbols
+            alpha_count = sum(c.isalpha() for c in chunk)
+
+            if alpha_count < 20:
+
+                continue
+
+            key = chunk.lower()
+
+            if key in seen:
+
+                continue
+
+            seen.add(key)
+
+            cleaned_chunks.append(chunk)
 
         return cleaned_chunks

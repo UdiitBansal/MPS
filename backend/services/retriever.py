@@ -75,38 +75,125 @@ class Retriever:
 
         }
 
+    # =====================================================
+    # Decide how many chunks to retrieve
+    # =====================================================
+
     def detect_top_k(self, question):
 
-        q = question.lower()
+        q = " ".join(question.lower().split())
 
-        if any(keyword in q for keyword in self.summary_keywords):
+        is_summary = any(
+            keyword in q
+            for keyword in self.summary_keywords
+        )
+
+        is_compare = any(
+            keyword in q
+            for keyword in self.compare_keywords
+        )
+
+        is_detail = any(
+            keyword in q
+            for keyword in self.detail_keywords
+        )
+
+        if is_summary and is_compare:
+
+            return max(
+                SUMMARY_TOP_K,
+                COMPARE_TOP_K
+            )
+
+        if is_summary:
 
             return SUMMARY_TOP_K
 
-        if any(keyword in q for keyword in self.compare_keywords):
+        if is_compare:
 
             return COMPARE_TOP_K
 
-        if any(keyword in q for keyword in self.detail_keywords):
+        if is_detail:
 
-            return 20
+            return max(
+                DEFAULT_TOP_K,
+                15
+            )
 
         return DEFAULT_TOP_K
 
+    # =====================================================
+    # Search
+    # =====================================================
+
     def search(self, question):
 
-        question = question.strip()
+        question = " ".join(
 
-        if not question:
+            question.strip().lower().split()
+
+        )
+
+        if len(question) < 2:
 
             return []
 
         top_k = self.detect_top_k(question)
 
-        return self.hybrid.retrieve(
+        try:
 
-            question,
+            results = self.hybrid.retrieve(
 
-            top_k=top_k
+                question,
+
+                top_k=top_k
+
+            )
+
+        except Exception as e:
+
+            print(f"Retriever Error : {e}")
+
+            return []
+
+        # =================================================
+        # Remove Duplicate Chunks
+        # =================================================
+
+        unique_results = []
+
+        seen = set()
+
+        for item in results:
+
+            key = (
+
+                item.get("source", ""),
+
+                item.get("page", "-"),
+
+                item.get("chunk", "-")
+
+            )
+
+            if key in seen:
+
+                continue
+
+            seen.add(key)
+
+            unique_results.append(item)
+
+        # =================================================
+        # Sort by Score
+        # =================================================
+
+        unique_results.sort(
+
+            key=lambda x: x.get("score", 0),
+
+            reverse=True
 
         )
+
+        return unique_results

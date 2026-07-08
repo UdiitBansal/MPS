@@ -1,7 +1,6 @@
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 import time
-import fitz
 
 from backend.config import (
     UPLOAD_DIR,
@@ -29,49 +28,95 @@ class DocumentIndex:
 
         self.metadata = []
 
+    # =====================================================
+    # Process Single PDF
+    # =====================================================
+
     def process_pdf(self, pdf):
 
         print(f"\nReading : {pdf.name}")
 
-        text = PDFReader.read_pdf(str(pdf))
+        result = PDFReader.read_pdf(
 
-        if not text:
+            str(pdf)
 
-            return [], [], 0
+        )
 
-        # Get actual page count
-        with fitz.open(str(pdf)) as doc:
+        page_data = result.get(
 
-            actual_pages = len(doc)
+            "pages",
 
-        chunks = Chunker.split(text)
+            []
+
+        )
+
+        total_pages = result.get(
+
+            "total_pages",
+
+            0
+
+        )
+
+        if not page_data:
+
+            return [], [], total_pages
 
         pdf_chunks = []
 
         pdf_metadata = []
 
-        for i, chunk in enumerate(chunks, start=1):
+        chunk_number = 1
 
-            chunk = chunk.strip()
+        # ----------------------------------------------
+        # Process Page Wise
+        # ----------------------------------------------
 
-            if not chunk:
+        for page in page_data:
+
+            page_number = page["page"]
+
+            page_text = page["text"].strip()
+
+            if not page_text:
+
                 continue
 
-            pdf_chunks.append(chunk)
+            chunks = Chunker.split(
 
-            pdf_metadata.append(
-
-                {
-
-                    "source": pdf.name,
-
-                    "page": "-",
-
-                    "chunk": i
-
-                }
+                page_text
 
             )
+
+            for chunk in chunks:
+
+                chunk = chunk.strip()
+
+                if not chunk:
+
+                    continue
+
+                pdf_chunks.append(
+
+                    chunk
+
+                )
+
+                pdf_metadata.append(
+
+                    {
+
+                        "source": pdf.name,
+
+                        "page": page_number,
+
+                        "chunk": chunk_number
+
+                    }
+
+                )
+
+                chunk_number += 1
 
         return (
 
@@ -79,9 +124,13 @@ class DocumentIndex:
 
             pdf_metadata,
 
-            actual_pages
+            total_pages
 
         )
+
+    # =====================================================
+    # Build Index
+    # =====================================================
 
     def build(self):
 
@@ -97,7 +146,7 @@ class DocumentIndex:
 
         )
 
-        if len(pdf_files) == 0:
+        if not pdf_files:
 
             return {
 
@@ -131,13 +180,21 @@ class DocumentIndex:
 
         for chunks, metadata, pages in results:
 
-            self.all_chunks.extend(chunks)
+            self.all_chunks.extend(
 
-            self.metadata.extend(metadata)
+                chunks
+
+            )
+
+            self.metadata.extend(
+
+                metadata
+
+            )
 
             total_pages += pages
 
-        if len(self.all_chunks) == 0:
+        if not self.all_chunks:
 
             return {
 
@@ -147,6 +204,10 @@ class DocumentIndex:
 
             }
 
+        # ----------------------------------------------
+        # Generate Embeddings
+        # ----------------------------------------------
+
         print("\nGenerating Embeddings...")
 
         embeddings = self.embedder.encode(
@@ -155,9 +216,17 @@ class DocumentIndex:
 
         )
 
+        # ----------------------------------------------
+        # Reset Chroma
+        # ----------------------------------------------
+
         print("Resetting ChromaDB...")
 
         self.chroma.reset_collection()
+
+        # ----------------------------------------------
+        # Save Embeddings
+        # ----------------------------------------------
 
         print("Saving Embeddings...")
 
@@ -170,6 +239,10 @@ class DocumentIndex:
             self.metadata
 
         )
+
+        # ----------------------------------------------
+        # Build BM25
+        # ----------------------------------------------
 
         print("Building BM25...")
 

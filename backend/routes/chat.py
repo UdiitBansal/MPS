@@ -4,7 +4,6 @@ from pydantic import BaseModel
 from backend.services.retriever import Retriever
 from backend.services.ollama_service import OllamaService
 
-
 router = APIRouter(
     prefix="/chat",
     tags=["Chat"]
@@ -24,7 +23,6 @@ def chat(request: ChatRequest):
     question = request.question.strip()
 
     if not question:
-
         return {
             "status": "error",
             "question": "",
@@ -33,6 +31,46 @@ def chat(request: ChatRequest):
             "retrieved_chunks": 0,
             "total_sources": 0
         }
+
+    q = question.lower()
+
+    # ------------------------------------------
+    # Decide number of chunks
+    # ------------------------------------------
+
+    if any(word in q for word in [
+
+        "summary",
+        "summarize",
+        "summarise",
+        "overall summary",
+        "executive summary",
+        "research report",
+        "all pdf",
+        "all documents"
+
+    ]):
+
+        max_chunks = 20
+
+    elif any(word in q for word in [
+
+        "compare",
+        "comparison",
+        "difference",
+        "differences",
+        "similarity",
+        "similarities",
+        "contrast",
+        "common"
+
+    ]):
+
+        max_chunks = 15
+
+    else:
+
+        max_chunks = 8
 
     retrieved_chunks = retriever.search(question)
 
@@ -51,71 +89,61 @@ def chat(request: ChatRequest):
 
     source_list = []
 
-    for i, item in enumerate(retrieved_chunks, start=1):
+    seen = set()
 
-        if isinstance(item, dict):
+    for item in retrieved_chunks:
 
-            pdf = item.get("source", "Unknown")
+        if len(context_parts) >= max_chunks:
+            break
 
-            page = item.get("page", "-")
+        if not isinstance(item, dict):
 
-            chunk = item.get("chunk", "-")
-
-            score = item.get("score", 0)
-
-            text = item.get("text", "").strip()
-
-            context_parts.append(
-                f"""
-==================================================
-DOCUMENT {i}
-==================================================
-
-PDF: {pdf}
-Page: {page}
-Chunk: {chunk}
-
-{text}
-"""
-            )
-
-            source_list.append({
-
-                "source": pdf,
-
-                "page": page,
-
-                "chunk": chunk,
-
-                "score": score
-
-            })
-
-        else:
-
-            text = str(item).strip()
-
-            context_parts.append(
-                f"""
-==================================================
-DOCUMENT {i}
-==================================================
-
-{text}
-"""
-            )
-
-            source_list.append({
-
+            item = {
                 "source": "Unknown",
-
                 "page": "-",
+                "chunk": "-",
+                "score": 0,
+                "text": str(item)
+            }
 
-                "chunk": i,
+        text = item.get("text", "").strip()
 
-                "score": 0
+        if not text:
+            continue
 
-            })
+        # Stable duplicate detection
+        key = " ".join(text.split())
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+
+        context_parts.append(
+            f"""
+==============================
+PDF : {item.get('source', 'Unknown')}
+Page : {item.get('page', '-')}
+Chunk : {item.get('chunk', '-')}
+==============================
+
+{text}
+"""
+        )
+
+        source_list.append({
+
+            "source": item.get("source", "Unknown"),
+
+            "page": item.get("page", "-"),
+
+            "chunk": item.get("chunk", "-"),
+
+            "score": round(float(item.get("score", 0)), 4),
+
+            "text": text[:700]
+
+        })
 
     context = "\n".join(context_parts)
 
@@ -134,7 +162,7 @@ DOCUMENT {i}
 
         "sources": source_list,
 
-        "retrieved_chunks": len(retrieved_chunks),
+        "retrieved_chunks": len(context_parts),
 
         "total_sources": len(source_list)
 

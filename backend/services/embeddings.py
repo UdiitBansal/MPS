@@ -1,4 +1,6 @@
 import numpy as np
+import torch
+
 from sentence_transformers import SentenceTransformer
 
 from backend.config import (
@@ -14,13 +16,23 @@ class EmbeddingModel:
 
         print("\nLoading Embedding Model...")
 
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        print(f"Using Device : {device.upper()}")
+
         self.model = SentenceTransformer(
+
             EMBEDDING_MODEL,
-            device="cpu"
+
+            device=device
+
         )
 
+        # New API (replaces deprecated method)
         self.embedding_dimension = (
-            self.model.get_sentence_embedding_dimension()
+
+            self.model.get_embedding_dimension()
+
         )
 
         print("Embedding Model Loaded Successfully.\n")
@@ -28,6 +40,7 @@ class EmbeddingModel:
     def encode(self, texts):
 
         if isinstance(texts, str):
+
             texts = [texts]
 
         texts = [
@@ -41,39 +54,60 @@ class EmbeddingModel:
         ]
 
         if not texts:
+
             return np.array([])
 
-        embeddings = self.model.encode(
+        try:
 
-            texts,
+            embeddings = self.model.encode(
 
-            batch_size=EMBEDDING_BATCH_SIZE,
+                texts,
 
-            convert_to_numpy=True,
+                batch_size=EMBEDDING_BATCH_SIZE,
 
-            normalize_embeddings=NORMALIZE_EMBEDDINGS,
+                convert_to_numpy=True,
 
-            show_progress_bar=False
+                normalize_embeddings=NORMALIZE_EMBEDDINGS,
 
-        )
+                show_progress_bar=False
 
-        return embeddings
+            )
+
+            return embeddings
+
+        except Exception as e:
+
+            print(f"Embedding Error : {e}")
+
+            return np.array([])
 
     def encode_query(self, query):
 
-        embedding = self.model.encode(
+        if not query:
 
-            query,
+            return np.array([])
 
-            convert_to_numpy=True,
+        try:
 
-            normalize_embeddings=NORMALIZE_EMBEDDINGS,
+            embedding = self.model.encode(
 
-            show_progress_bar=False
+                query,
 
-        )
+                convert_to_numpy=True,
 
-        return embedding
+                normalize_embeddings=NORMALIZE_EMBEDDINGS,
+
+                show_progress_bar=False
+
+            )
+
+            return embedding
+
+        except Exception as e:
+
+            print(f"Query Embedding Error : {e}")
+
+            return np.array([])
 
     def dimension(self):
 

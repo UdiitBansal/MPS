@@ -20,6 +20,25 @@ for folder in (
     folder.mkdir(parents=True, exist_ok=True)
 
 # ==========================================================
+# APPLICATION
+# ==========================================================
+
+APP_NAME = "AI Research Assistant"
+PROJECT_NAME = "Multi PDF Research Summarizer"
+APP_VERSION = "2.2.0"
+AUTHOR = "Udiit Bansal"
+
+# ==========================================================
+# API
+# ==========================================================
+
+API_PREFIX = "/api"
+
+ALLOWED_ORIGINS = [
+    "*"
+]
+
+# ==========================================================
 # OLLAMA
 # ==========================================================
 
@@ -31,66 +50,80 @@ OLLAMA_TIMEOUT = 300
 # EMBEDDING MODEL
 # ==========================================================
 
-# Best balance of accuracy + speed for research RAG
 EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
 
 EMBEDDING_BATCH_SIZE = 64
+
 NORMALIZE_EMBEDDINGS = True
+
+# ==========================================================
+# PDF SETTINGS
+# ==========================================================
+
+SUPPORTED_FILE_TYPES = [".pdf"]
+
+MAX_PDFS = 5
+
+MAX_FILE_SIZE_MB = 50
+
+OCR_DPI = 200
+
+MAX_WORKERS = 4
 
 # ==========================================================
 # CHUNKING
 # ==========================================================
 
 CHUNK_SIZE = 1000
+
 CHUNK_OVERLAP = 150
 
-# ==========================================================
-# PDF SETTINGS
-# ==========================================================
-
-MAX_PDFS = 5
-
-SUPPORTED_FILE_TYPES = [".pdf"]
-
-MAX_FILE_SIZE_MB = 50
-
-OCR_DPI = 200
-
-# Number of worker threads used for
-# parallel PDF/page processing
-MAX_WORKERS = 4
+MAX_CONTEXT_CHARACTERS = 14000
 
 # ==========================================================
 # RETRIEVAL
 # ==========================================================
 
 DEFAULT_TOP_K = 10
+
 SUMMARY_TOP_K = 35
+
 COMPARE_TOP_K = 30
+
+DETAIL_TOP_K = 20
+
 MAX_CONTEXT_CHUNKS = 35
+
+SEMANTIC_WEIGHT = 0.80
+
+KEYWORD_WEIGHT = 0.20
+
+BM25_SCORE_WEIGHT = 0.01
 
 # ==========================================================
 # GENERATION
 # ==========================================================
 
 TEMPERATURE = 0.1
-TOP_P = 0.9
+
+TOP_P = 0.90
+
 TOP_K = 40
+
 REPEAT_PENALTY = 1.15
+
 MAX_TOKENS = 1024
 
-# ==========================================================
-# APPLICATION
-# ==========================================================
+SUMMARY_MAX_TOKENS = 800
 
-APP_NAME = "AI Research Assistant"
-APP_VERSION = "2.1.0"
-AUTHOR = "Udiit Bansal"
-PROJECT_NAME = "Multi PDF Research Summarizer"
+COMPARE_MAX_TOKENS = 700
+
+QA_MAX_TOKENS = 350
 
 # ==========================================================
 # LOGGING
 # ==========================================================
 
 ENABLE_LOGGING = True
+
 LOG_LEVEL = "INFO"

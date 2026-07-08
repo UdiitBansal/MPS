@@ -23,8 +23,14 @@ router = APIRouter(
 
 @router.post("/")
 async def upload_pdfs(
+
     files: list[UploadFile] = File(...)
+
 ):
+
+    # ---------------------------------------
+    # Validation
+    # ---------------------------------------
 
     if not files:
 
@@ -56,7 +62,10 @@ async def upload_pdfs(
 
     )
 
-    # Remove previous PDFs
+    # ---------------------------------------
+    # Remove Previous PDFs
+    # ---------------------------------------
+
     for pdf in upload_path.glob("*.pdf"):
 
         try:
@@ -71,9 +80,25 @@ async def upload_pdfs(
 
     total_size = 0
 
+    used_names = set()
+
+    # ---------------------------------------
+    # Save PDFs
+    # ---------------------------------------
+
     for file in files:
 
-        filename = Path(file.filename).name
+        if not file.filename:
+
+            raise HTTPException(
+
+                status_code=400,
+
+                detail="Invalid filename."
+
+            )
+
+        filename = Path(file.filename).name.strip()
 
         extension = Path(filename).suffix.lower()
 
@@ -87,19 +112,61 @@ async def upload_pdfs(
 
             )
 
+        # Prevent duplicate names
+
+        original_name = Path(filename).stem
+
+        counter = 1
+
+        while filename in used_names:
+
+            filename = f"{original_name}_{counter}.pdf"
+
+            counter += 1
+
+        used_names.add(filename)
+
         destination = upload_path / filename
 
-        with open(destination, "wb") as buffer:
+        try:
 
-            shutil.copyfileobj(
+            with open(destination, "wb") as buffer:
 
-                file.file,
+                shutil.copyfileobj(
 
-                buffer
+                    file.file,
+
+                    buffer
+
+                )
+
+        finally:
+
+            file.file.close()
+
+        if not destination.exists():
+
+            raise HTTPException(
+
+                status_code=500,
+
+                detail=f"Failed to save {filename}."
 
             )
 
         size = destination.stat().st_size
+
+        if size == 0:
+
+            destination.unlink(missing_ok=True)
+
+            raise HTTPException(
+
+                status_code=400,
+
+                detail=f"{filename} is empty."
+
+            )
 
         if size > MAX_FILE_SIZE_MB * 1024 * 1024:
 
@@ -116,6 +183,10 @@ async def upload_pdfs(
         uploaded_files.append(filename)
 
         total_size += size
+
+    # ---------------------------------------
+    # Response
+    # ---------------------------------------
 
     return {
 

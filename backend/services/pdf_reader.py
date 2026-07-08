@@ -1,6 +1,7 @@
 import fitz
 import easyocr
 import numpy as np
+
 from concurrent.futures import ThreadPoolExecutor
 
 from backend.config import OCR_DPI, MAX_WORKERS
@@ -22,95 +23,217 @@ class PDFReader:
 
         page_number, page = page_data
 
-        text = page.get_text("text").strip()
+        try:
 
-        if text:
+            text = page.get_text("text").strip()
+
+            # -----------------------------
+            # Normal PDF Text
+            # -----------------------------
+
+            if text:
+
+                print(
+                    f"✓ Page {page_number} : Text Extracted ({len(text)} chars)"
+                )
+
+                return {
+
+                    "page": page_number,
+
+                    "text": text
+
+                }
+
+            # -----------------------------
+            # OCR
+            # -----------------------------
 
             print(
-                f"✓ Page {page_number} : Text Extracted ({len(text)} chars)"
+                f"Page {page_number} : Running OCR..."
             )
 
-            return page_number, text
+            pix = page.get_pixmap(
+                dpi=OCR_DPI
+            )
 
-        print(
-            f"Page {page_number} : Running OCR..."
-        )
+            image = np.frombuffer(
+                pix.samples,
+                dtype=np.uint8
+            ).reshape(
+                pix.height,
+                pix.width,
+                pix.n
+            )
 
-        pix = page.get_pixmap(
-            dpi=OCR_DPI
-        )
+            # Convert grayscale to RGB
 
-        image = np.frombuffer(
-            pix.samples,
-            dtype=np.uint8
-        ).reshape(
-            pix.height,
-            pix.width,
-            pix.n
-        )
+            if pix.n == 1:
 
-        result = PDFReader.reader.readtext(
-            image,
-            detail=0,
-            paragraph=True
-        )
+                image = np.stack(
+                    [image] * 3,
+                    axis=-1
+                )
 
-        ocr_text = "\n".join(result)
+            # Remove alpha channel
 
-        print(
-            f"✓ Page {page_number} : OCR ({len(ocr_text)} chars)"
-        )
+            elif pix.n == 4:
 
-        return page_number, ocr_text
+                image = image[:, :, :3]
+
+            result = PDFReader.reader.readtext(
+
+                image,
+
+                detail=0,
+
+                paragraph=True
+
+            )
+
+            ocr_text = "\n".join(result).strip()
+
+            print(
+                f"✓ Page {page_number} : OCR ({len(ocr_text)} chars)"
+            )
+
+            return {
+
+                "page": page_number,
+
+                "text": ocr_text
+
+            }
+
+        except Exception as e:
+
+            print(
+
+                f"✗ Page {page_number} : {e}"
+
+            )
+
+            return {
+
+                "page": page_number,
+
+                "text": ""
+
+            }
 
     @staticmethod
     def read_pdf(pdf_path):
 
         print(f"\nOpening PDF : {pdf_path}")
 
-        document = fitz.open(pdf_path)
+        try:
 
-        total_pages = len(document)
+            with fitz.open(pdf_path) as document:
 
-        print(f"Total Pages : {total_pages}")
+                total_pages = len(document)
 
-        pages = [
+                print(f"Total Pages : {total_pages}")
 
-            (i + 1, document.load_page(i))
+                pages = [
 
-            for i in range(total_pages)
+                    (
 
-        ]
+                        i + 1,
 
-        with ThreadPoolExecutor(
-            max_workers=MAX_WORKERS
-        ) as executor:
+                        document.load_page(i)
 
-            results = list(
-                executor.map(
-                    PDFReader.process_page,
-                    pages
-                )
+                    )
+
+                    for i in range(total_pages)
+
+                ]
+
+                with ThreadPoolExecutor(
+
+                    max_workers=MAX_WORKERS
+
+                ) as executor:
+
+                    results = list(
+
+                        executor.map(
+
+                            PDFReader.process_page,
+
+                            pages
+
+                        )
+
+                    )
+
+        except Exception as e:
+
+            print(
+
+                f"Error opening PDF : {e}"
+
             )
 
-        document.close()
+            return {
+
+                "text": "",
+
+                "pages": [],
+
+                "total_pages": 0
+
+            }
+
+        # ---------------------------------
+        # Sort by Page Number
+        # ---------------------------------
 
         results.sort(
-            key=lambda x: x[0]
-        )
 
-        final_text = "\n\n".join(
-
-            text
-
-            for _, text in results
-
-            if text.strip()
+            key=lambda x: x["page"]
 
         )
+
+        page_data = []
+
+        all_text = []
+
+        total_chars = 0
+
+        for item in results:
+
+            page_text = item["text"].strip()
+
+            if not page_text:
+
+                continue
+
+            page_data.append({
+
+                "page": item["page"],
+
+                "text": page_text
+
+            })
+
+            all_text.append(page_text)
+
+            total_chars += len(page_text)
+
+        final_text = "\n\n".join(all_text)
 
         print(
-            f"\nTotal Characters Extracted : {len(final_text)}"
+
+            f"\nTotal Characters Extracted : {total_chars}"
+
         )
 
-        return final_text.strip()
+        return {
+
+            "text": final_text,
+
+            "pages": page_data,
+
+            "total_pages": total_pages
+
+        }

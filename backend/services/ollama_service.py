@@ -8,7 +8,10 @@ from backend.config import (
     TOP_P,
     TOP_K,
     REPEAT_PENALTY,
-    MAX_TOKENS
+    MAX_CONTEXT_CHARACTERS,
+    SUMMARY_MAX_TOKENS,
+    COMPARE_MAX_TOKENS,
+    QA_MAX_TOKENS
 )
 
 
@@ -20,68 +23,165 @@ class OllamaService:
 
     def generate(self, question, context):
 
+        question = question.strip()
         q = question.lower()
 
-        # ---------------- SUMMARY ----------------
+        # ---------------------------------------------------
+        # Limit Context Size
+        # ---------------------------------------------------
 
-        if any(word in q for word in [
+        if len(context) > MAX_CONTEXT_CHARACTERS:
+
+            context = context[:MAX_CONTEXT_CHARACTERS]
+
+        # ---------------------------------------------------
+        # Detect Query Type
+        # ---------------------------------------------------
+
+        summary = any(word in q for word in [
 
             "summary",
             "summarize",
             "summarise",
             "overall summary",
             "executive summary",
+            "research report",
             "all pdf",
-            "all documents",
-            "research report"
+            "all pdfs",
+            "all documents"
 
-        ]):
+        ])
 
-            instructions = """
-Generate a document-wise summary.
-
-Rules:
-
-- Treat every PDF separately.
-- Use the PDF name as the heading.
-- Summarize only that PDF.
-- Never mix documents.
-- Use concise bullet points.
-- Remove duplicate information.
-- End with a short Overall Summary.
-- Use ONLY the supplied context.
-"""
-
-        # ---------------- COMPARISON ----------------
-
-        elif any(word in q for word in [
+        compare = any(word in q for word in [
 
             "compare",
             "comparison",
             "difference",
             "differences",
             "similarity",
+            "similarities",
+            "contrast",
             "common",
-            "contrast"
+            "versus",
+            "vs"
 
-        ]):
+        ])
+
+        # ---------------------------------------------------
+        # Summary + Compare
+        # ---------------------------------------------------
+
+        if summary and compare:
+
+            num_predict = SUMMARY_MAX_TOKENS
 
             instructions = """
-Compare the uploaded documents.
+Generate a complete research report.
+
+Format:
+
+# Executive Summary
+
+# Document-wise Summary
+
+For every uploaded PDF provide:
+
+- Document Name
+- Purpose
+- Main Topics
+- Important Points
+
+# Similarities
+
+# Differences
+
+# Key Findings
+
+# Conclusion
 
 Rules:
 
-- Mention every PDF separately.
-- Show similarities.
-- Show differences.
-- Use a markdown table whenever appropriate.
-- End with a conclusion.
 - Use ONLY the supplied context.
+- Never invent information.
+- Remove duplicate information.
+- Use markdown headings.
+- Keep the report concise and professional.
 """
 
-        # ---------------- NORMAL QA ----------------
+        # ---------------------------------------------------
+        # Summary
+        # ---------------------------------------------------
+
+        elif summary:
+
+            num_predict = SUMMARY_MAX_TOKENS
+
+            instructions = """
+Generate a professional research summary.
+
+Format:
+
+# Executive Summary
+
+# Document-wise Summary
+
+For every uploaded PDF include:
+
+- Document Name
+- Purpose
+- Main Topics
+- Important Points
+
+# Overall Findings
+
+# Conclusion
+
+Rules:
+
+- Use ONLY the supplied context.
+- Never invent information.
+- Remove duplicate information.
+- Use markdown headings.
+"""
+
+        # ---------------------------------------------------
+        # Comparison
+        # ---------------------------------------------------
+
+        elif compare:
+
+            num_predict = COMPARE_MAX_TOKENS
+
+            instructions = """
+Compare all uploaded PDFs.
+
+Include:
+
+# Documents Compared
+
+# Similarities
+
+# Differences
+
+# Comparison Table
+
+# Conclusion
+
+Rules:
+
+- Use ONLY the supplied context.
+- Never invent information.
+- Remove duplicate information.
+- Use markdown.
+"""
+
+        # ---------------------------------------------------
+        # Question Answering
+        # ---------------------------------------------------
 
         else:
+
+            num_predict = QA_MAX_TOKENS
 
             instructions = """
 Answer ONLY from the supplied context.
@@ -89,90 +189,115 @@ Answer ONLY from the supplied context.
 Rules:
 
 - Give the answer first.
-- Then explain briefly.
-- Use headings and bullets.
-- Combine information naturally.
-- Do not repeat sentences.
-- Ignore duplicate chunks.
-- Do NOT mention:
-    - Chunk number
-    - Relevance score
-    - Context number
+- Explain briefly.
+- Use bullet points where appropriate.
+- Never mention chunk numbers, scores or metadata.
 - Never invent information.
-- If the answer is unavailable reply exactly:
+
+If the answer cannot be found reply exactly:
 
 I could not find the answer in the uploaded documents.
 """
 
+        # ---------------------------------------------------
+        # Prompt
+        # ---------------------------------------------------
+
         prompt = f"""
 You are an AI Research Assistant.
 
-You MUST answer ONLY from the supplied context.
+Answer ONLY from the supplied context.
 
-Never use outside knowledge.
+If the answer is unavailable reply exactly:
 
-Never hallucinate.
+I could not find the answer in the uploaded documents.
 
-Never mention chunk numbers,
-document numbers,
-retrieval scores,
-or internal metadata.
-
-==========================
+========================
 CONTEXT
-==========================
+========================
 
 {context}
 
-==========================
+========================
 QUESTION
-==========================
+========================
 
 {question}
 
-==========================
-INSTRUCTIONS
-==========================
+========================
+TASK
+========================
 
 {instructions}
 
-==========================
+========================
 ANSWER
-==========================
+========================
 """
 
-        response = requests.post(
+        try:
 
-            self.url,
+            response = requests.post(
 
-            json={
+                self.url,
 
-                "model": OLLAMA_MODEL,
+                json={
 
-                "prompt": prompt,
+                    "model": OLLAMA_MODEL,
 
-                "stream": False,
+                    "prompt": prompt,
 
-                "options": {
+                    "stream": False,
 
-                    "temperature": TEMPERATURE,
+                    "keep_alive": "30m",
 
-                    "top_p": TOP_P,
+                    "options": {
 
-                    "top_k": TOP_K,
+                        "temperature": TEMPERATURE,
 
-                    "repeat_penalty": REPEAT_PENALTY,
+                        "top_p": TOP_P,
 
-                    "num_predict": MAX_TOKENS
+                        "top_k": TOP_K,
 
-                }
+                        "repeat_penalty": REPEAT_PENALTY,
 
-            },
+                        "num_predict": num_predict,
 
-            timeout=OLLAMA_TIMEOUT
+                        "stop": [
 
-        )
+                            "QUESTION",
+                            "CONTEXT",
+                            "TASK"
 
-        response.raise_for_status()
+                        ]
 
-        return response.json()["response"].strip()
+                    }
+
+                },
+
+                timeout=OLLAMA_TIMEOUT
+
+            )
+
+            response.raise_for_status()
+
+            answer = response.json().get(
+
+                "response",
+                ""
+
+            ).strip()
+
+            if not answer:
+
+                return "I could not find the answer in the uploaded documents."
+
+            return answer
+
+        except requests.exceptions.RequestException as e:
+
+            return f"Ollama connection error: {str(e)}"
+
+        except Exception as e:
+
+            return f"Unexpected error: {str(e)}"

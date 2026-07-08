@@ -3,6 +3,7 @@ from time import perf_counter
 from fastapi import APIRouter
 
 from backend.indexes.document_index import index
+from backend.config import OLLAMA_MODEL
 
 router = APIRouter(
     prefix="/process",
@@ -19,21 +20,15 @@ def process_documents():
 
     end = perf_counter()
 
+    processing_time = round(end - start, 2)
+
+    result["processing_time"] = processing_time
+
+    result["model"] = OLLAMA_MODEL
+
     if result.get("status") == "success":
 
-        result["processing_time"] = round(
-            end - start,
-            2
-        )
-
         result["message"] = "Documents processed successfully."
-
-    else:
-
-        result["processing_time"] = round(
-            end - start,
-            2
-        )
 
     print(result)
 

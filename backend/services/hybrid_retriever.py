@@ -6,50 +6,88 @@ class HybridRetriever:
     def __init__(self, chroma, bm25, embedder):
 
         self.chroma = chroma
-
         self.bm25 = bm25
-
         self.embedder = embedder
+
+    # =====================================================
+    # Hybrid Retrieval
+    # =====================================================
 
     def retrieve(self, query, top_k=10):
 
-        query = query.strip()
+        query = " ".join(query.strip().split())
 
         if not query:
 
             return []
 
-        # ---------------- Query Embedding ----------------
+        try:
 
-        query_embedding = self.embedder.encode_query(
-            query
-        )
+            query_embedding = self.embedder.encode_query(query)
 
-        # ---------------- Semantic Search ----------------
+        except Exception as e:
 
-        semantic_results = self.chroma.search(
-            query_embedding,
-            top_k * 2
-        )
+            print(f"Embedding Error : {e}")
 
-        # ---------------- Keyword Search ----------------
+            return []
 
-        keyword_results = self.bm25.search(
-            query,
-            top_k * 2
-        )
+        search_k = max(top_k * 2, 20)
+
+        # -------------------------------------------------
+        # Chroma Semantic Search
+        # -------------------------------------------------
+
+        try:
+
+            semantic_results = self.chroma.search(
+
+                query_embedding,
+
+                search_k
+
+            )
+
+        except Exception as e:
+
+            print(f"Chroma Error : {e}")
+
+            semantic_results = []
+
+        # -------------------------------------------------
+        # BM25 Search
+        # -------------------------------------------------
+
+        try:
+
+            keyword_results = self.bm25.search(
+
+                query,
+
+                search_k
+
+            )
+
+        except Exception as e:
+
+            print(f"BM25 Error : {e}")
+
+            keyword_results = []
 
         scores = defaultdict(float)
 
         documents = {}
 
-        # ==================================================
-        # Chroma Score (Higher Weight)
-        # ==================================================
+        # =================================================
+        # Semantic Score (Higher Weight)
+        # =================================================
 
         for rank, item in enumerate(semantic_results):
 
-            text = item["text"]
+            text = item.get("text", "").strip()
+
+            if not text:
+
+                continue
 
             documents[text] = item
 
@@ -57,13 +95,21 @@ class HybridRetriever:
 
             scores[text] += semantic_score * 0.75
 
-        # ==================================================
+        # =================================================
         # BM25 Score
-        # ==================================================
+        # =================================================
 
         for rank, item in enumerate(keyword_results):
 
-            text = item["text"]
+            if item.get("score", 0) <= 0:
+
+                continue
+
+            text = item.get("text", "").strip()
+
+            if not text:
+
+                continue
 
             documents[text] = item
 
@@ -71,11 +117,11 @@ class HybridRetriever:
 
             scores[text] += keyword_rank * 0.25
 
-            scores[text] += item["score"] * 0.015
+            scores[text] += item.get("score", 0) * 0.015
 
-        # ==================================================
+        # =================================================
         # Final Ranking
-        # ==================================================
+        # =================================================
 
         ranked = sorted(
 
@@ -91,6 +137,8 @@ class HybridRetriever:
 
         seen = set()
 
+        max_score = ranked[0][1] if ranked else 1
+
         for text, score in ranked:
 
             normalized = " ".join(text.split())
@@ -101,9 +149,15 @@ class HybridRetriever:
 
             seen.add(normalized)
 
-            doc = documents[text]
+            doc = documents[text].copy()
 
-            doc["score"] = round(score, 4)
+            # ----------------------------------------------
+            # Confidence (0 - 1)
+            # ----------------------------------------------
+
+            confidence = min(score / max_score, 1.0)
+
+            doc["score"] = round(confidence, 4)
 
             final_results.append(doc)
 
