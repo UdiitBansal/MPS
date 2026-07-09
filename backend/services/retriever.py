@@ -4,7 +4,8 @@ from backend.services.hybrid_retriever import HybridRetriever
 from backend.config import (
     DEFAULT_TOP_K,
     SUMMARY_TOP_K,
-    COMPARE_TOP_K
+    COMPARE_TOP_K,
+    DETAIL_TOP_K
 )
 
 
@@ -51,7 +52,42 @@ class Retriever:
             "common",
             "common topics",
             "same",
-            "unique"
+            "unique",
+            "versus",
+            "vs"
+
+        }
+
+        self.claim_keywords = {
+
+            "claim",
+            "claims",
+            "key claim",
+            "key claims",
+            "main claim",
+            "important claim"
+
+        }
+
+        self.theme_keywords = {
+
+            "theme",
+            "themes",
+            "topic",
+            "topics",
+            "cluster",
+            "clustering"
+
+        }
+
+        self.contradiction_keywords = {
+
+            "contradiction",
+            "contradict",
+            "conflict",
+            "conflicts",
+            "opposite",
+            "disagree"
 
         }
 
@@ -76,49 +112,36 @@ class Retriever:
         }
 
     # =====================================================
-    # Decide how many chunks to retrieve
+    # Decide Retrieval Size
     # =====================================================
 
     def detect_top_k(self, question):
 
         q = " ".join(question.lower().split())
 
-        is_summary = any(
-            keyword in q
-            for keyword in self.summary_keywords
-        )
-
-        is_compare = any(
-            keyword in q
-            for keyword in self.compare_keywords
-        )
-
-        is_detail = any(
-            keyword in q
-            for keyword in self.detail_keywords
-        )
-
-        if is_summary and is_compare:
-
-            return max(
-                SUMMARY_TOP_K,
-                COMPARE_TOP_K
-            )
-
-        if is_summary:
+        if any(k in q for k in self.summary_keywords):
 
             return SUMMARY_TOP_K
 
-        if is_compare:
+        if any(k in q for k in self.compare_keywords):
 
             return COMPARE_TOP_K
 
-        if is_detail:
+        if any(k in q for k in self.claim_keywords):
 
-            return max(
-                DEFAULT_TOP_K,
-                15
-            )
+            return max(COMPARE_TOP_K, 25)
+
+        if any(k in q for k in self.theme_keywords):
+
+            return max(COMPARE_TOP_K, 25)
+
+        if any(k in q for k in self.contradiction_keywords):
+
+            return max(COMPARE_TOP_K, 25)
+
+        if any(k in q for k in self.detail_keywords):
+
+            return DETAIL_TOP_K
 
         return DEFAULT_TOP_K
 
@@ -128,13 +151,9 @@ class Retriever:
 
     def search(self, question):
 
-        question = " ".join(
+        question = " ".join(question.strip().split())
 
-            question.strip().lower().split()
-
-        )
-
-        if len(question) < 2:
+        if not question:
 
             return []
 
@@ -156,25 +175,21 @@ class Retriever:
 
             return []
 
-        # =================================================
-        # Remove Duplicate Chunks
-        # =================================================
-
         unique_results = []
 
         seen = set()
 
+        used_documents = set()
+
         for item in results:
 
-            key = (
+            source = item.get("source", "Unknown")
 
-                item.get("source", ""),
+            page = item.get("page", "-")
 
-                item.get("page", "-"),
+            chunk = item.get("chunk", "-")
 
-                item.get("chunk", "-")
-
-            )
+            key = (source, page, chunk)
 
             if key in seen:
 
@@ -184,15 +199,19 @@ class Retriever:
 
             unique_results.append(item)
 
-        # =================================================
-        # Sort by Score
-        # =================================================
+            used_documents.add(source)
 
         unique_results.sort(
 
             key=lambda x: x.get("score", 0),
 
             reverse=True
+
+        )
+
+        print(
+
+            f"Retriever -> {len(unique_results)} chunks from {len(used_documents)} documents"
 
         )
 

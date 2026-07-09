@@ -18,6 +18,10 @@ class ChromaStore:
             name=self.COLLECTION_NAME
         )
 
+    # =====================================================
+    # Reset Collection
+    # =====================================================
+
     def reset_collection(self):
 
         try:
@@ -34,6 +38,10 @@ class ChromaStore:
             name=self.COLLECTION_NAME
         )
 
+    # =====================================================
+    # Clear Collection
+    # =====================================================
+
     def clear(self):
 
         try:
@@ -44,27 +52,24 @@ class ChromaStore:
 
             if ids:
 
-                self.collection.delete(
-                    ids=ids
-                )
+                self.collection.delete(ids=ids)
 
         except Exception:
 
             pass
 
+    # =====================================================
+    # Add Documents
+    # =====================================================
+
     def add_documents(
-
         self,
-
         chunks,
-
         embeddings,
-
         metadata_list
-
     ):
 
-        if len(chunks) == 0:
+        if not chunks:
 
             return
 
@@ -88,33 +93,41 @@ class ChromaStore:
 
         )
 
+    # =====================================================
+    # Search
+    # =====================================================
+
     def search(
-
         self,
-
         embedding,
-
         top_k=10
-
     ):
 
-        result = self.collection.query(
+        try:
 
-            query_embeddings=[embedding.tolist()],
+            result = self.collection.query(
 
-            n_results=top_k,
+                query_embeddings=[embedding.tolist()],
 
-            include=[
+                n_results=top_k,
 
-                "documents",
+                include=[
 
-                "metadatas",
+                    "documents",
 
-                "distances"
+                    "metadatas",
 
-            ]
+                    "distances"
 
-        )
+                ]
+
+            )
+
+        except Exception as e:
+
+            print(f"Chroma Search Error : {e}")
+
+            return []
 
         documents = result.get(
 
@@ -142,6 +155,8 @@ class ChromaStore:
 
         retrieved = []
 
+        seen = set()
+
         for doc, meta, distance in zip(
 
             documents,
@@ -152,15 +167,31 @@ class ChromaStore:
 
         ):
 
+            if not doc:
+
+                continue
+
+            normalized = " ".join(
+
+                doc.split()
+
+            )
+
+            if normalized in seen:
+
+                continue
+
+            seen.add(normalized)
+
             similarity = max(
 
                 0.0,
 
-                round(
+                min(
 
-                    1 - float(distance),
+                    1.0,
 
-                    4
+                    1 - float(distance)
 
                 )
 
@@ -180,34 +211,84 @@ class ChromaStore:
 
                     ),
 
-                    "chunk": meta.get(
-
-                        "chunk",
-
-                        0
-
-                    ),
-
                     "page": meta.get(
 
                         "page",
+
+                        meta.get(
+
+                            "page_number",
+
+                            "-"
+
+                        )
+
+                    ),
+
+                    "chunk": meta.get(
+
+                        "chunk",
 
                         "-"
 
                     ),
 
-                    "score": similarity
+                    "score": round(
+
+                        similarity,
+
+                        4
+
+                    ),
+
+                    "distance": round(
+
+                        float(distance),
+
+                        4
+
+                    )
 
                 }
 
             )
 
-        return retrieved
+        retrieved.sort(
+
+            key=lambda x: x["score"],
+
+            reverse=True
+
+        )
+
+        return retrieved[:top_k]
+
+    # =====================================================
+    # Get All
+    # =====================================================
 
     def get_all_documents(self):
 
         return self.collection.get()
 
+    # =====================================================
+    # Count
+    # =====================================================
+
     def document_count(self):
 
         return self.collection.count()
+
+    # =====================================================
+    # Collection Info
+    # =====================================================
+
+    def stats(self):
+
+        return {
+
+            "collection": self.COLLECTION_NAME,
+
+            "documents": self.document_count()
+
+        }

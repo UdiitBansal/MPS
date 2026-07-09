@@ -4,7 +4,11 @@ import time
 
 from backend.config import (
     UPLOAD_DIR,
-    MAX_WORKERS
+    MAX_WORKERS,
+    CHUNK_SIZE,
+    CHUNK_OVERLAP,
+    EMBEDDING_MODEL,
+    OLLAMA_MODEL
 )
 
 from backend.services.pdf_reader import PDFReader
@@ -36,27 +40,11 @@ class DocumentIndex:
 
         print(f"\nReading : {pdf.name}")
 
-        result = PDFReader.read_pdf(
+        result = PDFReader.read_pdf(str(pdf))
 
-            str(pdf)
+        page_data = result.get("pages", [])
 
-        )
-
-        page_data = result.get(
-
-            "pages",
-
-            []
-
-        )
-
-        total_pages = result.get(
-
-            "total_pages",
-
-            0
-
-        )
+        total_pages = result.get("total_pages", 0)
 
         if not page_data:
 
@@ -68,9 +56,7 @@ class DocumentIndex:
 
         chunk_number = 1
 
-        # ----------------------------------------------
-        # Process Page Wise
-        # ----------------------------------------------
+        seen = set()
 
         for page in page_data:
 
@@ -82,11 +68,7 @@ class DocumentIndex:
 
                 continue
 
-            chunks = Chunker.split(
-
-                page_text
-
-            )
+            chunks = Chunker.split(page_text)
 
             for chunk in chunks:
 
@@ -96,11 +78,15 @@ class DocumentIndex:
 
                     continue
 
-                pdf_chunks.append(
+                key = chunk.lower()
 
-                    chunk
+                if key in seen:
 
-                )
+                    continue
+
+                seen.add(key)
+
+                pdf_chunks.append(chunk)
 
                 pdf_metadata.append(
 
@@ -117,6 +103,12 @@ class DocumentIndex:
                 )
 
                 chunk_number += 1
+
+        print(
+
+            f"{pdf.name} -> {len(pdf_chunks)} chunks"
+
+        )
 
         return (
 
@@ -158,7 +150,9 @@ class DocumentIndex:
 
         total_pages = 0
 
-        print("\nProcessing PDFs in Parallel...\n")
+        print("\n===================================")
+        print("Processing PDFs")
+        print("===================================\n")
 
         with ThreadPoolExecutor(
 
@@ -180,17 +174,9 @@ class DocumentIndex:
 
         for chunks, metadata, pages in results:
 
-            self.all_chunks.extend(
+            self.all_chunks.extend(chunks)
 
-                chunks
-
-            )
-
-            self.metadata.extend(
-
-                metadata
-
-            )
+            self.metadata.extend(metadata)
 
             total_pages += pages
 
@@ -204,9 +190,11 @@ class DocumentIndex:
 
             }
 
-        # ----------------------------------------------
-        # Generate Embeddings
-        # ----------------------------------------------
+        print(f"\nTotal Chunks : {len(self.all_chunks)}")
+
+        # =====================================================
+        # Embeddings
+        # =====================================================
 
         print("\nGenerating Embeddings...")
 
@@ -216,17 +204,23 @@ class DocumentIndex:
 
         )
 
-        # ----------------------------------------------
-        # Reset Chroma
-        # ----------------------------------------------
+        if len(embeddings) == 0:
+
+            return {
+
+                "status": "error",
+
+                "message": "Embedding generation failed."
+
+            }
+
+        # =====================================================
+        # Chroma
+        # =====================================================
 
         print("Resetting ChromaDB...")
 
         self.chroma.reset_collection()
-
-        # ----------------------------------------------
-        # Save Embeddings
-        # ----------------------------------------------
 
         print("Saving Embeddings...")
 
@@ -240,9 +234,9 @@ class DocumentIndex:
 
         )
 
-        # ----------------------------------------------
-        # Build BM25
-        # ----------------------------------------------
+        # =====================================================
+        # BM25
+        # =====================================================
 
         print("Building BM25...")
 
@@ -276,7 +270,23 @@ class DocumentIndex:
 
             "embedding_dimension": self.embedder.dimension(),
 
-            "processing_time": processing_time
+            "processing_time": processing_time,
+
+            "model": OLLAMA_MODEL,
+
+            "embedding_model": EMBEDDING_MODEL,
+
+            "chunk_size": CHUNK_SIZE,
+
+            "chunk_overlap": CHUNK_OVERLAP,
+
+            "index_type": "Hybrid Retrieval",
+
+            "vector_database": "ChromaDB",
+
+            "keyword_search": "BM25",
+
+            "ready_for_chat": True
 
         }
 

@@ -137,7 +137,7 @@ class HybridRetriever:
 
         seen = set()
 
-        max_score = ranked[0][1] if ranked else 1
+        max_score = max(ranked[0][1], 1e-6) if ranked else 1.0
 
         for text, score in ranked:
 
@@ -155,7 +155,7 @@ class HybridRetriever:
             # Confidence (0 - 1)
             # ----------------------------------------------
 
-            confidence = min(score / max_score, 1.0)
+            confidence = round(min(score / max_score, 1.0), 4)
 
             doc["score"] = round(confidence, 4)
 

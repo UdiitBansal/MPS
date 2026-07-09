@@ -606,11 +606,8 @@ async function askAI() {
     }
 
     catch (err) {
-
         console.log(err);
-
         askBtn.disabled = false;
-
         answer.innerHTML = `
         <div class="welcome-box">
 

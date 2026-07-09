@@ -14,28 +14,54 @@ class EmbeddingModel:
 
     def __init__(self):
 
-        print("\nLoading Embedding Model...")
+        print("\n===================================")
+        print("Loading Embedding Model...")
+        print("===================================\n")
 
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        print(f"Using Device : {device.upper()}")
+        print(f"Using Device : {self.device.upper()}")
 
         self.model = SentenceTransformer(
 
             EMBEDDING_MODEL,
 
-            device=device
+            device=self.device
 
         )
 
-        # New API (replaces deprecated method)
         self.embedding_dimension = (
 
             self.model.get_embedding_dimension()
 
         )
 
-        print("Embedding Model Loaded Successfully.\n")
+        print(f"Embedding Model : {EMBEDDING_MODEL}")
+
+        print(f"Embedding Dimension : {self.embedding_dimension}")
+
+        print("\nEmbedding Model Loaded Successfully.\n")
+
+    # =====================================================
+    # Clean Text
+    # =====================================================
+
+    @staticmethod
+    def clean_text(text):
+
+        if not text:
+
+            return ""
+
+        return " ".join(
+
+            str(text).split()
+
+        )
+
+    # =====================================================
+    # Batch Embeddings
+    # =====================================================
 
     def encode(self, texts):
 
@@ -45,17 +71,23 @@ class EmbeddingModel:
 
         texts = [
 
-            text.strip()
+            self.clean_text(text)
 
             for text in texts
 
-            if text and text.strip()
+            if text and self.clean_text(text)
 
         ]
 
         if not texts:
 
-            return np.array([])
+            return np.empty(
+
+                (0, self.embedding_dimension),
+
+                dtype=np.float32
+
+            )
 
         try:
 
@@ -73,19 +105,37 @@ class EmbeddingModel:
 
             )
 
-            return embeddings
+            return embeddings.astype(np.float32)
 
         except Exception as e:
 
             print(f"Embedding Error : {e}")
 
-            return np.array([])
+            return np.empty(
+
+                (0, self.embedding_dimension),
+
+                dtype=np.float32
+
+            )
+
+    # =====================================================
+    # Query Embedding
+    # =====================================================
 
     def encode_query(self, query):
 
+        query = self.clean_text(query)
+
         if not query:
 
-            return np.array([])
+            return np.empty(
+
+                self.embedding_dimension,
+
+                dtype=np.float32
+
+            )
 
         try:
 
@@ -101,14 +151,69 @@ class EmbeddingModel:
 
             )
 
-            return embedding
+            return embedding.astype(np.float32)
 
         except Exception as e:
 
             print(f"Query Embedding Error : {e}")
 
-            return np.array([])
+            return np.empty(
+
+                self.embedding_dimension,
+
+                dtype=np.float32
+
+            )
+
+    # =====================================================
+    # Cosine Similarity
+    # =====================================================
+
+    @staticmethod
+    def cosine_similarity(vec1, vec2):
+
+        try:
+
+            return float(
+
+                np.dot(vec1, vec2) /
+
+                (
+
+                    np.linalg.norm(vec1) *
+
+                    np.linalg.norm(vec2)
+
+                )
+
+            )
+
+        except Exception:
+
+            return 0.0
+
+    # =====================================================
+    # Embedding Dimension
+    # =====================================================
 
     def dimension(self):
 
         return self.embedding_dimension
+
+    # =====================================================
+    # Model Information
+    # =====================================================
+
+    def info(self):
+
+        return {
+
+            "model": EMBEDDING_MODEL,
+
+            "dimension": self.embedding_dimension,
+
+            "device": self.device,
+
+            "normalized": NORMALIZE_EMBEDDINGS
+
+        }

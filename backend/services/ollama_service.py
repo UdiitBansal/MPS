@@ -11,7 +11,11 @@ from backend.config import (
     MAX_CONTEXT_CHARACTERS,
     SUMMARY_MAX_TOKENS,
     COMPARE_MAX_TOKENS,
-    QA_MAX_TOKENS
+    QA_MAX_TOKENS,
+    CLAIM_MAX_TOKENS,
+    THEME_MAX_TOKENS,
+    CONTRADICTION_MAX_TOKENS,
+    RESEARCH_BRIEF_MAX_TOKENS
 )
 
 
@@ -21,22 +25,14 @@ class OllamaService:
 
         self.url = f"{OLLAMA_HOST}/api/generate"
 
-    def generate(self, question, context):
+    # ======================================================
+    # Detect Query Type
+    # ======================================================
 
-        question = question.strip()
-        q = question.lower()
+    @staticmethod
+    def detect_query(question: str):
 
-        # ---------------------------------------------------
-        # Limit Context Size
-        # ---------------------------------------------------
-
-        if len(context) > MAX_CONTEXT_CHARACTERS:
-
-            context = context[:MAX_CONTEXT_CHARACTERS]
-
-        # ---------------------------------------------------
-        # Detect Query Type
-        # ---------------------------------------------------
+        q = question.lower().strip()
 
         summary = any(word in q for word in [
 
@@ -45,7 +41,6 @@ class OllamaService:
             "summarise",
             "overall summary",
             "executive summary",
-            "research report",
             "all pdf",
             "all pdfs",
             "all documents"
@@ -62,20 +57,191 @@ class OllamaService:
             "similarities",
             "contrast",
             "common",
-            "versus",
-            "vs"
+            "vs",
+            "versus"
 
         ])
 
-        # ---------------------------------------------------
-        # Summary + Compare
-        # ---------------------------------------------------
+        claims = any(word in q for word in [
 
-        if summary and compare:
+            "claim",
+            "claims",
+            "key claim",
+            "key claims",
+            "important claims",
+            "main claims"
 
-            num_predict = SUMMARY_MAX_TOKENS
+        ])
 
-            instructions = """
+        themes = any(word in q for word in [
+
+            "theme",
+            "themes",
+            "topic",
+            "topics",
+            "cluster",
+            "clustering"
+
+        ])
+
+        contradictions = any(word in q for word in [
+
+            "contradiction",
+            "contradict",
+            "conflict",
+            "opposite",
+            "disagree"
+
+        ])
+
+        report = any(word in q for word in [
+
+            "research brief",
+            "research report",
+            "full report",
+            "complete report"
+
+        ])
+
+        return {
+
+            "summary": summary,
+
+            "compare": compare,
+
+            "claims": claims,
+
+            "themes": themes,
+
+            "contradictions": contradictions,
+
+            "report": report
+
+        }
+
+    # ======================================================
+    # Context Limiter
+    # ======================================================
+
+    @staticmethod
+    def trim_context(context):
+
+        if len(context) <= MAX_CONTEXT_CHARACTERS:
+
+            return context
+
+        return context[:MAX_CONTEXT_CHARACTERS]
+
+    # ======================================================
+    # Prompt Builder
+    # ======================================================
+
+    @staticmethod
+    def build_prompt(question, context, instructions):
+
+        return f"""
+You are an AI Research Assistant.
+
+You MUST answer ONLY from the supplied context.
+
+Never use outside knowledge.
+
+Never hallucinate.
+
+Never fabricate facts.
+
+Never mention:
+
+- Chunk Number
+- Retrieval Score
+- Metadata
+- Internal IDs
+
+If information is unavailable reply exactly:
+
+I could not find the answer in the uploaded documents.
+
+==================================================
+CONTEXT
+==================================================
+
+{context}
+
+==================================================
+QUESTION
+==================================================
+
+{question}
+
+==================================================
+TASK
+==================================================
+
+{instructions}
+
+==================================================
+ANSWER
+==================================================
+"""
+    # ======================================================
+    # Prompt Selector
+    # ======================================================
+
+    def get_prompt(self, question):
+
+        flags = self.detect_query(question)
+
+        # --------------------------------------------------
+        # Research Brief
+        # --------------------------------------------------
+
+        if flags["report"]:
+
+            return (
+                RESEARCH_BRIEF_MAX_TOKENS,
+                """
+Generate a professional Research Brief.
+
+Format:
+
+# Executive Summary
+
+# Documents Analysed
+
+# Main Themes
+
+# Key Claims
+
+# Similarities
+
+# Differences
+
+# Contradictions
+
+# Research Gaps
+
+# Final Conclusion
+
+Rules:
+
+- Use ONLY the supplied context.
+- Never invent information.
+- Merge duplicate information.
+- Use markdown headings.
+- Use bullet points.
+- Mention PDF names whenever possible.
+"""
+            )
+
+        # --------------------------------------------------
+        # Summary + Comparison
+        # --------------------------------------------------
+
+        if flags["summary"] and flags["compare"]:
+
+            return (
+                RESEARCH_BRIEF_MAX_TOKENS,
+                """
 Generate a complete research report.
 
 Format:
@@ -83,13 +249,6 @@ Format:
 # Executive Summary
 
 # Document-wise Summary
-
-For every uploaded PDF provide:
-
-- Document Name
-- Purpose
-- Main Topics
-- Important Points
 
 # Similarities
 
@@ -101,61 +260,64 @@ For every uploaded PDF provide:
 
 Rules:
 
-- Use ONLY the supplied context.
-- Never invent information.
+- Use ONLY supplied context.
+- Never hallucinate.
 - Remove duplicate information.
-- Use markdown headings.
-- Keep the report concise and professional.
+- Mention every PDF.
 """
+            )
 
-        # ---------------------------------------------------
+        # --------------------------------------------------
         # Summary
-        # ---------------------------------------------------
+        # --------------------------------------------------
 
-        elif summary:
+        if flags["summary"]:
 
-            num_predict = SUMMARY_MAX_TOKENS
-
-            instructions = """
-Generate a professional research summary.
+            return (
+                SUMMARY_MAX_TOKENS,
+                """
+Generate a document-wise summary.
 
 Format:
 
 # Executive Summary
 
-# Document-wise Summary
+For EACH PDF include
 
-For every uploaded PDF include:
+## PDF Name
 
-- Document Name
-- Purpose
-- Main Topics
-- Important Points
+Purpose
 
-# Overall Findings
+Main Topics
 
-# Conclusion
+Important Points
 
-Rules:
+Key Findings
 
-- Use ONLY the supplied context.
+Finish with
+
+# Overall Summary
+
+Rules
+
+- Never mix documents.
 - Never invent information.
-- Remove duplicate information.
 - Use markdown headings.
 """
+            )
 
-        # ---------------------------------------------------
+        # --------------------------------------------------
         # Comparison
-        # ---------------------------------------------------
+        # --------------------------------------------------
 
-        elif compare:
+        if flags["compare"]:
 
-            num_predict = COMPARE_MAX_TOKENS
-
-            instructions = """
+            return (
+                COMPARE_MAX_TOKENS,
+                """
 Compare all uploaded PDFs.
 
-Include:
+Format
 
 # Documents Compared
 
@@ -167,73 +329,205 @@ Include:
 
 # Conclusion
 
-Rules:
+Rules
 
-- Use ONLY the supplied context.
+- Mention every PDF.
+- Use markdown table.
 - Never invent information.
-- Remove duplicate information.
-- Use markdown.
+- Do NOT say
+'I could not find the answer'
+if documents exist.
 """
+            )
 
-        # ---------------------------------------------------
-        # Question Answering
-        # ---------------------------------------------------
+        # --------------------------------------------------
+        # Key Claims
+        # --------------------------------------------------
 
-        else:
+        if flags["claims"]:
 
-            num_predict = QA_MAX_TOKENS
+            return (
+                CLAIM_MAX_TOKENS,
+                """
+Extract the important claims.
 
-            instructions = """
+For every PDF provide
+
+# PDF Name
+
+## Key Claims
+
+• Claim 1
+
+• Claim 2
+
+• Claim 3
+
+Mention supporting evidence when available.
+
+Never invent claims.
+Only use supplied context.
+"""
+            )
+
+        # --------------------------------------------------
+        # Themes
+        # --------------------------------------------------
+
+        if flags["themes"]:
+
+            return (
+                THEME_MAX_TOKENS,
+                """
+Identify cross-document themes.
+
+Format
+
+# Theme 1
+
+Documents
+
+Key Discussion
+
+----------------
+
+# Theme 2
+
+Documents
+
+Key Discussion
+
+----------------
+
+# Overall Themes
+
+Rules
+
+- Group similar topics.
+- Mention PDF names.
+- Never invent information.
+"""
+            )
+
+        # --------------------------------------------------
+        # Contradictions
+        # --------------------------------------------------
+
+        if flags["contradictions"]:
+
+            return (
+                CONTRADICTION_MAX_TOKENS,
+                """
+Find contradictory information.
+
+Format
+
+# Contradictions
+
+PDF A
+
+Statement
+
+PDF B
+
+Statement
+
+Reason
+
+If no contradiction exists say
+
+"No contradictions were found."
+
+Never invent contradictions.
+"""
+            )
+
+        # --------------------------------------------------
+        # Default QA
+        # --------------------------------------------------
+
+        return (
+            QA_MAX_TOKENS,
+            """
 Answer ONLY from the supplied context.
 
-Rules:
+Rules
 
-- Give the answer first.
+- Give answer first.
 - Explain briefly.
-- Use bullet points where appropriate.
-- Never mention chunk numbers, scores or metadata.
-- Never invent information.
+- Use bullets.
+- Never mention metadata.
+- Never hallucinate.
 
-If the answer cannot be found reply exactly:
+If unavailable reply exactly
 
 I could not find the answer in the uploaded documents.
 """
+        )
 
-        # ---------------------------------------------------
-        # Prompt
-        # ---------------------------------------------------
+    # ======================================================
+    # Generate Response
+    # ======================================================
 
-        prompt = f"""
-You are an AI Research Assistant.
+    def generate(self, question, context):
 
-Answer ONLY from the supplied context.
+        question = question.strip()
 
-If the answer is unavailable reply exactly:
+        if not question:
 
-I could not find the answer in the uploaded documents.
+            return "Please enter a question."
 
-========================
-CONTEXT
-========================
+        context = self.trim_context(context)
 
-{context}
+        num_predict, instructions = self.get_prompt(question)
 
-========================
-QUESTION
-========================
+        prompt = self.build_prompt(
 
-{question}
+            question,
 
-========================
-TASK
-========================
+            context,
 
-{instructions}
+            instructions
 
-========================
-ANSWER
-========================
-"""
+        )
+
+        payload = {
+
+            "model": OLLAMA_MODEL,
+
+            "prompt": prompt,
+
+            "stream": False,
+
+            "keep_alive": "30m",
+
+            "options": {
+
+                "temperature": TEMPERATURE,
+
+                "top_p": TOP_P,
+
+                "top_k": TOP_K,
+
+                "repeat_penalty": REPEAT_PENALTY,
+
+                "num_predict": num_predict,
+
+                "stop": [
+
+                    "QUESTION",
+
+                    "CONTEXT",
+
+                    "TASK",
+
+                    "ANSWER"
+
+                ]
+
+            }
+
+        }
 
         try:
 
@@ -241,39 +535,7 @@ ANSWER
 
                 self.url,
 
-                json={
-
-                    "model": OLLAMA_MODEL,
-
-                    "prompt": prompt,
-
-                    "stream": False,
-
-                    "keep_alive": "30m",
-
-                    "options": {
-
-                        "temperature": TEMPERATURE,
-
-                        "top_p": TOP_P,
-
-                        "top_k": TOP_K,
-
-                        "repeat_penalty": REPEAT_PENALTY,
-
-                        "num_predict": num_predict,
-
-                        "stop": [
-
-                            "QUESTION",
-                            "CONTEXT",
-                            "TASK"
-
-                        ]
-
-                    }
-
-                },
+                json=payload,
 
                 timeout=OLLAMA_TIMEOUT
 
@@ -281,9 +543,12 @@ ANSWER
 
             response.raise_for_status()
 
-            answer = response.json().get(
+            data = response.json()
+
+            answer = data.get(
 
                 "response",
+
                 ""
 
             ).strip()
@@ -292,12 +557,68 @@ ANSWER
 
                 return "I could not find the answer in the uploaded documents."
 
-            return answer
+            # ------------------------------------------
+            # Cleanup
+            # ------------------------------------------
+
+            answer = answer.replace(
+
+                "Answer:",
+
+                ""
+
+            ).replace(
+
+                "ANSWER:",
+
+                ""
+
+            ).strip()
+
+            while "\n\n\n" in answer:
+
+                answer = answer.replace(
+
+                    "\n\n\n",
+
+                    "\n\n"
+
+                )
+
+            if len(answer) > 5:
+
+                return answer
+
+            return "I could not find the answer in the uploaded documents."
+
+        except requests.exceptions.Timeout:
+
+            return (
+
+                "The language model took too long to respond. "
+
+                "Please try again."
+
+            )
+
+        except requests.exceptions.ConnectionError:
+
+            return (
+
+                "Unable to connect to Ollama. "
+
+                "Please make sure Ollama is running."
+
+            )
+
+        except requests.exceptions.HTTPError as e:
+
+            return f"Ollama HTTP Error: {e}"
 
         except requests.exceptions.RequestException as e:
 
-            return f"Ollama connection error: {str(e)}"
+            return f"Request Error: {e}"
 
         except Exception as e:
 
-            return f"Unexpected error: {str(e)}"
+            return f"Unexpected Error: {e}"
