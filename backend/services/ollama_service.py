@@ -544,6 +544,9 @@ I could not find the answer in the uploaded documents.
             response.raise_for_status()
 
             data = response.json()
+            print("\n========== OLLAMA RESPONSE ==========")
+            print(data)
+            print("=====================================")
 
             answer = data.get(
 

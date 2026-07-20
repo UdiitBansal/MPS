@@ -91,7 +91,7 @@ class EmbeddingModel:
 
         try:
 
-            embeddings = self.model.encode(
+            embeddings = self.model.encode_document(
 
                 texts,
 
@@ -139,7 +139,7 @@ class EmbeddingModel:
 
         try:
 
-            embedding = self.model.encode(
+            embedding = self.model.encode_query(
 
                 query,
 
