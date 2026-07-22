@@ -58,27 +58,51 @@ if(heroUploadBtn){
 // LOADING
 // =====================================================
 
-function showLoading(message="Processing..."){
+function showLoading(message = "Processing...") {
 
-    if(!loadingModal) return;
+    if (!loadingModal) return;
 
-    loadingModal.style.display="flex";
+    loadingModal.style.display = "flex";
 
-    const text=loadingModal.querySelector("p");
+    // Update loading message
+    const text = loadingModal.querySelector(".loading-message");
 
-    if(text){
+    if (text) {
+        text.innerHTML = message;
+    }
 
-        text.innerHTML=message;
+    // Animate progress bar
+    const bar = loadingModal.querySelector(".progress-bar");
 
+    if (bar) {
+
+        // Reset
+        bar.style.transition = "none";
+        bar.style.width = "0%";
+
+        // Force browser repaint
+        bar.offsetWidth;
+
+        // Animate to 100%
+        bar.style.transition = "width 8s linear";
+        bar.style.width = "100%";
     }
 
 }
 
-function hideLoading(){
+function hideLoading() {
 
-    if(!loadingModal) return;
+    if (!loadingModal) return;
 
-    loadingModal.style.display="none";
+    // Reset progress bar
+    const bar = loadingModal.querySelector(".progress-bar");
+
+    if (bar) {
+        bar.style.transition = "none";
+        bar.style.width = "0%";
+    }
+
+    loadingModal.style.display = "none";
 
 }
 

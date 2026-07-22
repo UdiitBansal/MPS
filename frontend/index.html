@@ -886,7 +886,7 @@ href="style.css">
 
     <div class="section-title">
 
-        <h2>
+        <h2 style="color:white">
 
             Technology Stack
 
@@ -964,81 +964,224 @@ href="style.css">
 
 </section>
 
-<!-- ========================= -->
-<!-- FOOTER -->
-<!-- ========================= -->
+<!-- =========================
+     FOOTER
+========================= -->
 
-<footer>
+<footer class="footer">
 
-    <div class="footer-content">
+    <div class="footer-container">
 
-        <div>
+        <!-- Brand -->
+        <div class="footer-column">
 
-            <h3>
-
+            <h2 class="footer-logo">
                 AI Research Assistant
+            </h2>
 
-            </h3>
-
-            <p>
-
-                Multi Document Research Summarizer
-
+            <p class="footer-description">
+                Intelligent multi-document analysis powered by AI. Upload,
+                summarize, compare, and chat with your research papers using
+                advanced Retrieval-Augmented Generation (RAG).
             </p>
 
         </div>
 
-        <div>
+        <!-- Features -->
+        <div class="footer-column">
 
-            <p>
+            <h3>Features</h3>
 
-                FastAPI • ChromaDB • BM25 • Ollama • EasyOCR
+            <ul>
 
-            </p>
+                <li>Document Summarization</li>
+
+                <li>AI Question Answering</li>
+
+                <li>Document Comparison</li>
+
+                <li>Insight Generation</li>
+
+                <li>Executive Summary</li>
+
+            </ul>
+
+        </div>
+
+        <!-- Technology -->
+        <div class="footer-column">
+
+            <h3>Technology</h3>
+
+            <ul>
+
+                <li>FastAPI</li>
+
+                <li>ChromaDB</li>
+
+                <li>BM25 Retrieval</li>
+
+                <li>Ollama (Llama 3.2)</li>
+
+                <li>EasyOCR</li>
+
+            </ul>
+
+        </div>
+
+        <!-- Project -->
+        <div class="footer-column">
+
+            <h3>Project</h3>
+
+            <ul>
+
+                <li>Hybrid RAG Architecture</li>
+
+                <li>Semantic Search</li>
+
+                <li>Vector Database</li>
+
+                <li>Research Assistant</li>
+
+                <li>CDAC DBDA Project</li>
+
+            </ul>
 
         </div>
 
     </div>
 
-    <hr>
+    <div class="footer-bottom">
 
-    <p>
+        <p>
+            © 2026 AI Research Assistant • Built with ❤️ using FastAPI, Ollama & ChromaDB
+        </p>
 
-        © 2026 AI Research Assistant | Final Year Project
-
-    </p>
+    </div>
 
 </footer>
-
 </div>
 
-<!-- ========================= -->
-<!-- LOADING -->
-<!-- ========================= -->
+<!-- ==========================================================
+     PREMIUM AI LOADING MODAL
+=========================================================== -->
 
-<div
-id="loadingModal"
-class="loading-modal">
+<div id="loadingModal" class="loading-modal">
 
-    <div class="loading-content">
+    <div class="loading-card">
 
-        <div class="loader"></div>
+        <!-- Decorative Glow -->
+        <div class="card-glow"></div>
 
-        <h2>
+        <!-- Animated Data Flow -->
+        <div class="data-flow">
 
-            AI is Processing...
+            <span class="flow left l1"></span>
+            <span class="flow left l2"></span>
+            <span class="flow left l3"></span>
+
+            <div class="ai-core">
+
+                <div class="orbit orbit1"></div>
+                <div class="orbit orbit2"></div>
+                <div class="orbit orbit3"></div>
+
+                <div class="core"></div>
+
+            </div>
+
+            <span class="flow right r1"></span>
+            <span class="flow right r2"></span>
+            <span class="flow right r3"></span>
+
+        </div>
+
+        <!-- Title -->
+
+        <h2 class="loading-title">
+
+            AI is Processing
 
         </h2>
 
-        <p>
+        <!-- Dynamic Text (Updated by your JS) -->
+
+        <p class="loading-message">
 
             Uploading • Processing • Generating Summary
 
         </p>
 
+        <!-- Progress -->
+
+        <div class="progress-wrapper">
+
+            <div class="progress-bar"></div>
+
+        </div>
+
+        <!-- AI Processing Steps -->
+
+        <div class="processing-list">
+
+            <div class="step">
+
+                <span class="step-icon">📄</span>
+
+                <span>Uploading Documents</span>
+
+            </div>
+
+            <div class="step">
+
+                <span class="step-icon">🧠</span>
+
+                <span>Generating Embeddings</span>
+
+            </div>
+
+            <div class="step">
+
+                <span class="step-icon">🔍</span>
+
+                <span>Building Vector Index</span>
+
+            </div>
+
+            <div class="step">
+
+                <span class="step-icon">🤖</span>
+
+                <span>Running AI Analysis</span>
+
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+
+        <div class="loading-footer">
+
+            Please wait while the AI analyzes your documents...
+
+        </div>
+
     </div>
 
 </div>
+
+<!-- Toast -->
+
+<div id="toast"></div>
+
+<!-- Scroll Button -->
+
+<button id="scrollTop">
+
+    <i class="fa-solid fa-arrow-up"></i>
+
+</button>
 
 <div id="toast"></div>
 
