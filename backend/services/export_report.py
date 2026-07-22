@@ -2,8 +2,6 @@ from pathlib import Path
 from datetime import datetime
 
 from backend.config import REPORT_DIR
-
-
 class ReportExporter:
 
     def __init__(self):

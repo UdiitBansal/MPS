@@ -1,7 +1,11 @@
 from datetime import datetime
+import logging
+from collections import defaultdict
 
 from fastapi import APIRouter
 from pydantic import BaseModel
+
+from backend.indexes.document_index import index
 
 from backend.services.retriever import Retriever
 from backend.services.ollama_service import OllamaService
@@ -12,18 +16,26 @@ from backend.services.research_brief import ResearchBriefGenerator
 from backend.services.export_report import ReportExporter
 
 
-# =====================================================
+# ==========================================================
+# LOGGING
+# ==========================================================
+
+logger = logging.getLogger(__name__)
+
+
+# ==========================================================
 # ROUTER
-# =====================================================
+# ==========================================================
 
 router = APIRouter(
     prefix="/chat",
     tags=["Chat"]
 )
 
-# =====================================================
+
+# ==========================================================
 # SERVICES
-# =====================================================
+# ==========================================================
 
 retriever = Retriever()
 
@@ -43,35 +55,31 @@ research_brief = ResearchBriefGenerator()
 
 report_exporter = ReportExporter()
 
-# =====================================================
+
+# ==========================================================
 # REQUEST MODEL
-# =====================================================
+# ==========================================================
 
 class ChatRequest(BaseModel):
-
     question: str
 
 
-# =====================================================
+# ==========================================================
 # QUERY KEYWORDS
-# =====================================================
+# ==========================================================
 
 SUMMARY_KEYWORDS = {
-
     "summary",
     "summarize",
     "summarise",
     "overall summary",
     "executive summary",
-    "research report",
     "all pdf",
     "all pdfs",
     "all documents"
-
 }
 
 COMPARE_KEYWORDS = {
-
     "compare",
     "comparison",
     "difference",
@@ -80,58 +88,72 @@ COMPARE_KEYWORDS = {
     "similarities",
     "contrast",
     "common"
-
 }
 
 CLAIM_KEYWORDS = {
-
     "claim",
     "claims",
-    "key claim",
-    "key claims",
     "main claim",
+    "key claim",
     "important claim"
-
 }
 
 THEME_KEYWORDS = {
-
     "theme",
     "themes",
     "topic",
     "topics",
     "cluster",
     "clustering"
-
 }
 
 CONTRADICTION_KEYWORDS = {
-
     "contradiction",
     "contradict",
     "conflict",
     "opposite",
     "disagree"
-
 }
 
 REPORT_KEYWORDS = {
-
     "research brief",
     "brief",
     "full report",
     "complete report"
-
 }
 
 
-# =====================================================
-# DETECT QUERY TYPE
-# =====================================================
+# ==========================================================
+# GREETINGS
+# ==========================================================
 
-def detect_query_type(question: str):
+GREETINGS = {
+    "hi",
+    "hello",
+    "hey",
+    "good morning",
+    "good afternoon",
+    "good evening"
+}
 
-    q = question.lower()
+THANKS = {
+    "thanks",
+    "thank you"
+}
+
+GOODBYE = {
+    "bye",
+    "goodbye"
+}
+
+
+# ==========================================================
+# QUERY DETECTOR
+# ==========================================================
+
+def detect_query_type(question: str) -> str:
+
+    q = question.lower().strip()
 
     if any(k in q for k in REPORT_KEYWORDS):
         return "report"
@@ -154,210 +176,543 @@ def detect_query_type(question: str):
     return "question"
 
 
-# =====================================================
-# CONTEXT SIZE
-# =====================================================
+# ==========================================================
+# CHUNK LIMIT
+# ==========================================================
 
-def determine_chunk_limit(question):
+def determine_chunk_limit(query_type: str) -> int:
 
-    query_type = detect_query_type(question)
+    limits = {
+        "question": 8,
+        "summary": 20,
+        "comparison": 15,
+        "claims": 15,
+        "themes": 20,
+        "contradictions": 20,
+        "report": 25
+    }
 
-    if query_type == "summary":
-        return 20
-
-    if query_type == "comparison":
-        return 15
-
-    if query_type == "claims":
-        return 15
-
-    if query_type == "themes":
-        return 20
-
-    if query_type == "contradictions":
-        return 20
-
-    if query_type == "report":
-        return 25
-
-    return 8
+    return limits.get(query_type, 8)
 
 
-# =====================================================
+# ==========================================================
+# GROUP CHUNKS BY DOCUMENT
+# ==========================================================
+
+def group_chunks_by_document(chunks):
+
+    grouped = defaultdict(list)
+
+    for chunk in chunks:
+
+        grouped[
+            chunk.get("source", "Unknown")
+        ].append(chunk)
+
+    return grouped
+
+
+# ==========================================================
 # BUILD CONTEXT
-# =====================================================
+# ==========================================================
 
 def build_context(retrieved_chunks, max_chunks):
 
-    context_parts = []
-
-    sources = []
+    context = []
 
     documents = []
 
+    sources = []
+
     seen = set()
 
-    document_counter = {}
+    grouped = group_chunks_by_document(retrieved_chunks)
 
-    MAX_CHUNKS_PER_DOCUMENT = 6
+    MAX_CHUNKS_PER_DOCUMENT = 3
 
-    for item in retrieved_chunks:
+    total = 0
 
-        if len(context_parts) >= max_chunks:
+    for source, chunks in grouped.items():
 
-            break
+        chunks = sorted(
+            chunks,
+            key=lambda x: x.get("score", 0),
+            reverse=True
+        )
 
-        if not isinstance(item, dict):
+        for chunk in chunks[:MAX_CHUNKS_PER_DOCUMENT]:
 
-            item = {
+            if total >= max_chunks:
+                break
 
-                "source": "Unknown",
+            text = chunk.get("text", "").strip()
 
-                "page": "-",
+            if not text:
+                continue
 
-                "chunk": "-",
+            duplicate = " ".join(
+                text.split()
+            ).lower()
 
-                "score": 0,
+            if duplicate in seen:
+                continue
 
-                "text": str(item)
+            seen.add(duplicate)
 
-            }
-
-        text = item.get("text", "").strip()
-
-        if not text:
-
-            continue
-
-        duplicate_key = " ".join(text.split()).lower()
-
-        if duplicate_key in seen:
-
-            continue
-
-        source = item.get("source", "Unknown")
-
-        document_counter[source] = document_counter.get(source, 0) + 1
-
-        if document_counter[source] > MAX_CHUNKS_PER_DOCUMENT:
-
-            continue
-
-        seen.add(duplicate_key)
-
-        context_parts.append(
-
-            f"""
+            context.append(
+                f"""
 ====================================================
 PDF : {source}
-Page : {item.get("page","-")}
-Chunk : {item.get("chunk","-")}
+Page : {chunk.get('page','-')}
+Chunk : {chunk.get('chunk','-')}
 ====================================================
 
 {text}
 """
+            )
 
-        )
+            documents.append(
+                {
+                    "source": source,
+                    "page": chunk.get("page", "-"),
+                    "chunk": chunk.get("chunk", "-"),
+                    "score": round(
+                        float(chunk.get("score", 0)),
+                        4
+                    ),
+                    "text": text
+                }
+            )
 
-        documents.append(
+            sources.append(
+                {
+                    "source": source,
+                    "page": chunk.get("page", "-"),
+                    "chunk": chunk.get("chunk", "-"),
+                    "score": round(
+                        float(chunk.get("score", 0)),
+                        4
+                    ),
+                    "preview": (
+                        text[:300] + "..."
+                        if len(text) > 300
+                        else text
+                    )
+                }
+            )
 
-            {
+            total += 1
 
-                "source": source,
-
-                "page": item.get("page", "-"),
-
-                "chunk": item.get("chunk", "-"),
-
-                "score": round(float(item.get("score", 0)), 4),
-
-                "text": text
-
-            }
-
-        )
-
-        sources.append(
-
-            {
-
-                "source": source,
-
-                "page": item.get("page", "-"),
-
-                "chunk": item.get("chunk", "-"),
-
-                "score": round(float(item.get("score", 0)), 4),
-
-                "preview": (
-
-                    text[:300] + "..."
-
-                    if len(text) > 300
-
-                    else text
-
-                )
-
-            }
-
-        )
+    logger.info(
+        "Retriever -> %d chunks from %d documents",
+        len(documents),
+        len(grouped)
+    )
 
     return (
-
-        "\n".join(context_parts),
-
+        "\n".join(context),
         sources,
-
         documents
-
     )
-# =====================================================
-# CHAT
-# =====================================================
-
 @router.post("/")
 def chat(request: ChatRequest):
 
     start_time = datetime.now()
 
-    question = request.question.strip()
+    try:
 
-    if not question:
+        # =====================================================
+        # VALIDATE QUESTION
+        # =====================================================
 
-        return {
+        question = request.question.strip()
 
-            "status": "error",
+        if not question:
 
-            "question": "",
+            return {
+                "status": "error",
+                "question": "",
+                "answer": "Please enter a question.",
+                "sources": [],
+                "retrieved_chunks": 0,
+                "total_sources": 0
+            }
 
-            "answer": "Please enter a question.",
+        query_type = detect_query_type(question)
 
-            "sources": [],
+        logger.info("=" * 70)
+        logger.info("New Question")
+        logger.info("Question    : %s", question)
+        logger.info("Query Type  : %s", query_type)
 
-            "retrieved_chunks": 0,
+        # =====================================================
+        # SIMPLE CONVERSATION
+        # =====================================================
 
-            "total_sources": 0
+        q = question.lower()
 
-        }
+        if q in GREETINGS:
 
-    # -------------------------------------------------
-    # Retrieve Chunks
-    # -------------------------------------------------
+            if index.is_ready():
 
-    max_chunks = determine_chunk_limit(question)
+                return {
+                    "status": "success",
+                    "query_type": "greeting",
+                    "question": question,
+                    "answer": (
+                        "👋 Hello!\n\n"
+                        "Your documents are ready.\n\n"
+                        "You can now:\n"
+                        "• Ask questions\n"
+                        "• Generate executive summaries\n"
+                        "• Compare documents\n"
+                        "• Extract key claims\n"
+                        "• Find common themes\n"
+                        "• Detect contradictions\n"
+                        "• Generate research reports"
+                    ),
+                    "sources": [],
+                    "retrieved_chunks": 0,
+                    "total_sources": 0
+                }
 
-    retrieved_chunks = retriever.search(question)
+            return {
+                "status": "success",
+                "query_type": "greeting",
+                "question": question,
+                "answer": (
+                    "👋 Hello!\n\n"
+                    "Please upload and process one or more PDF documents first."
+                ),
+                "sources": [],
+                "retrieved_chunks": 0,
+                "total_sources": 0
+            }
 
-    if not retrieved_chunks:
+        if q in THANKS:
 
-        return {
+            return {
+                "status": "success",
+                "query_type": "thanks",
+                "question": question,
+                "answer": "😊 You're welcome! Happy to help.",
+                "sources": [],
+                "retrieved_chunks": 0,
+                "total_sources": 0
+            }
 
-            "status": "error",
+        if q in GOODBYE:
+
+            return {
+                "status": "success",
+                "query_type": "goodbye",
+                "question": question,
+                "answer": (
+                    "👋 Goodbye!\n\n"
+                    "Thanks for using the AI Research Assistant."
+                ),
+                "sources": [],
+                "retrieved_chunks": 0,
+                "total_sources": 0
+            }
+
+        # =====================================================
+        # DOCUMENT CHECK
+        # =====================================================
+
+        if not index.is_ready():
+
+            logger.warning("Document index is not ready.")
+
+            return {
+                "status": "error",
+                "question": question,
+                "answer": (
+                    "Please upload and process one or more PDF documents "
+                    "before asking questions."
+                ),
+                "sources": [],
+                "retrieved_chunks": 0,
+                "total_sources": 0
+            }
+
+        # =====================================================
+        # RETRIEVE DOCUMENTS
+        # =====================================================
+
+        max_chunks = determine_chunk_limit(query_type)
+
+        retrieved_chunks = retriever.search(question)
+
+        if not retrieved_chunks:
+
+            logger.warning("Retriever returned no results.")
+
+            return {
+                "status": "error",
+                "question": question,
+                "answer": (
+                    "I couldn't find relevant information in the uploaded "
+                    "documents for your question."
+                ),
+                "sources": [],
+                "retrieved_chunks": 0,
+                "total_sources": 0
+            }
+
+        context, sources, documents = build_context(
+            retrieved_chunks,
+            max_chunks
+        )
+
+        if not context.strip():
+
+            logger.warning("Context generation failed.")
+
+            return {
+                "status": "error",
+                "question": question,
+                "answer": (
+                    "The retrieved documents contained no usable text."
+                ),
+                "sources": [],
+                "retrieved_chunks": 0,
+                "total_sources": 0
+            }
+
+        logger.info("Retrieved Chunks : %d", len(documents))
+        logger.info("Unique Documents : %d",
+                    len({d['source'] for d in documents}))
+        logger.info("Context Length   : %d", len(context))
+
+        # =====================================================
+        # VARIABLES
+        # =====================================================
+
+        answer = ""
+
+        claims = None
+
+        themes = None
+
+        contradictions = None
+
+        brief = None
+
+        exports = None
+
+        summary = None
+
+        unique_documents = sorted(
+            {
+                doc["source"]
+                for doc in documents
+            }
+        )
+
+        # =====================================================
+        # AI PROCESSING STARTS HERE
+        # =====================================================
+                # =====================================================
+        # QUESTION / SUMMARY / COMPARISON
+        # =====================================================
+
+        if query_type in ("question", "summary", "comparison"):
+
+            answer = ollama.generate(
+                question=question,
+                context=context
+            )
+
+        # =====================================================
+        # CLAIM EXTRACTION
+        # =====================================================
+
+        elif query_type == "claims":
+
+            claims = claim_extractor.extract(documents)
+
+            answer = claim_extractor.to_markdown(claims)
+
+        # =====================================================
+        # THEME EXTRACTION
+        # =====================================================
+
+        elif query_type == "themes":
+
+            themes = theme_extractor.extract(documents)
+
+            answer = theme_extractor.to_markdown(themes)
+
+        # =====================================================
+        # CONTRADICTION DETECTION
+        # =====================================================
+
+        elif query_type == "contradictions":
+
+            contradictions = contradiction_detector.detect(
+                documents
+            )
+
+            answer = contradiction_detector.to_markdown(
+                contradictions
+            )
+
+        # =====================================================
+        # RESEARCH REPORT
+        # =====================================================
+
+        elif query_type == "report":
+
+            logger.info("Generating Executive Summary...")
+
+            summary = ollama.generate(
+                question="Generate a comprehensive executive summary.",
+                context=context
+            )
+
+            logger.info("Extracting Claims...")
+            claims = claim_extractor.extract(documents)
+
+            logger.info("Extracting Themes...")
+            themes = theme_extractor.extract(documents)
+
+            logger.info("Detecting Contradictions...")
+            contradictions = contradiction_detector.detect(
+                documents
+            )
+
+            logger.info("Generating Research Brief...")
+
+            brief = research_brief.generate(
+                summaries=summary,
+                claims=claims,
+                themes=themes,
+                contradictions=contradictions
+            )
+
+            answer = brief
+
+            logger.info("Exporting Report...")
+
+            exports = report_exporter.export(brief)
+
+        # =====================================================
+        # DEFAULT
+        # =====================================================
+
+        else:
+
+            answer = ollama.generate(
+                question=question,
+                context=context
+            )
+
+        # =====================================================
+        # FALLBACK
+        # =====================================================
+
+        if not answer or not answer.strip():
+
+            answer = (
+                "I couldn't generate a meaningful response "
+                "from the uploaded documents."
+            )
+
+        # =====================================================
+        # PROCESSING TIME
+        # =====================================================
+
+        processing_time = round(
+            (
+                datetime.now() - start_time
+            ).total_seconds(),
+            2
+        )
+
+        # =====================================================
+        # RESPONSE
+        # =====================================================
+
+        response = {
+
+            "status": "success",
+
+            "query_type": query_type,
 
             "question": question,
 
-            "answer": "I could not find the answer in the uploaded documents.",
+            "answer": answer,
+
+            "sources": sources,
+
+            "retrieved_chunks": len(documents),
+
+            "total_sources": len(sources),
+
+            "documents_used": unique_documents,
+
+            "documents_count": len(unique_documents),
+
+            "processing_time": processing_time,
+
+            "timestamp": datetime.now().strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+
+        }
+
+        # =====================================================
+        # OPTIONAL AI OUTPUTS
+        # =====================================================
+
+        if summary is not None:
+            response["summary"] = summary
+
+        if claims is not None:
+            response["claims"] = claims
+
+        if themes is not None:
+            response["themes"] = themes
+
+        if contradictions is not None:
+            response["contradictions"] = contradictions
+
+        if brief is not None:
+            response["research_brief"] = brief
+
+        if exports is not None:
+            response["exports"] = exports
+
+        logger.info(
+            "Completed in %.2f seconds",
+            processing_time
+        )
+
+        logger.info("=" * 70)
+
+        return response
+
+    # =====================================================
+    # EXCEPTION HANDLER
+    # =====================================================
+
+    except Exception as e:
+
+        logger.exception("Chat API Error")
+
+        return {
+
+            "status": "error",
+
+            "question": request.question,
+
+            "answer": (
+                "An unexpected error occurred while "
+                "processing your request."
+            ),
+
+            "error": str(e),
 
             "sources": [],
 
@@ -366,345 +721,3 @@ def chat(request: ChatRequest):
             "total_sources": 0
 
         }
-
-    context, sources, documents = build_context(
-
-        retrieved_chunks,
-
-        max_chunks
-
-    )
-    
-
-
-    query_type = detect_query_type(question)
-
-    answer = ""
-
-    claims = None
-
-    themes = None
-
-    contradictions = None
-
-    brief = None
-
-    exports = None
-
-    # -------------------------------------------------
-    # QUESTION / SUMMARY / COMPARISON
-    # -------------------------------------------------
-
-    if query_type in (
-
-        "question",
-
-        "summary",
-
-        "comparison"
-
-    ):
-
-        answer = ollama.generate(
-
-            question,
-
-            context
-
-        )
-
-    # -------------------------------------------------
-    # CLAIMS
-    # -------------------------------------------------
-
-    elif query_type == "claims":
-
-        claims = claim_extractor.extract(
-
-            documents
-
-        )
-
-        answer = claim_extractor.to_markdown(
-
-            claims
-
-        )
-
-    # -------------------------------------------------
-    # THEMES
-    # -------------------------------------------------
-
-    elif query_type == "themes":
-
-        themes = theme_extractor.extract(
-
-            documents
-
-        )
-
-        answer = theme_extractor.to_markdown(
-
-            themes
-
-        )
-
-    # -------------------------------------------------
-    # CONTRADICTIONS
-    # -------------------------------------------------
-
-    elif query_type == "contradictions":
-
-        contradictions = contradiction_detector.detect(
-
-            documents
-
-        )
-
-        answer = contradiction_detector.to_markdown(
-
-            contradictions
-
-        )
-
-    # -------------------------------------------------
-    # RESEARCH BRIEF
-    # -------------------------------------------------
-
-    elif query_type == "report":
-
-        summary = ollama.generate(
-
-            "Generate Executive Summary",
-
-            context
-
-        )
-
-        claims = claim_extractor.extract(
-
-            documents
-
-        )
-
-        themes = theme_extractor.extract(
-
-            documents
-
-        )
-
-        contradictions = contradiction_detector.detect(
-
-            documents
-
-        )
-
-        brief = research_brief.generate(
-
-            summaries=summary,
-
-            claims=claims,
-
-            themes=themes,
-
-            contradictions=contradictions
-
-        )
-
-        answer = brief
-
-        exports = report_exporter.export(
-
-            brief
-
-        )
-
-    else:
-
-        answer = ollama.generate(
-
-            question,
-
-            context
-
-        )
-
-    processing_time = round(
-
-        (
-
-            datetime.now()
-
-            -
-
-            start_time
-
-        ).total_seconds(),
-
-        2
-
-    )
-
-    unique_documents = sorted(
-
-        {
-
-            doc["source"]
-
-            for doc in documents
-
-        }
-
-    )
-
-    response = {
-
-        "status": "success",
-
-        "query_type": query_type,
-
-        "question": question,
-
-        "answer": answer,
-
-        "sources": sources,
-
-        "retrieved_chunks": len(documents),
-
-        "total_sources": len(sources),
-
-        "documents_used": unique_documents,
-
-        "documents_count": len(unique_documents),
-
-        "processing_time": processing_time,
-
-        "timestamp": datetime.now().strftime(
-
-            "%Y-%m-%d %H:%M:%S"
-
-        )
-
-    }
-
-    # -------------------------------------------------
-    # Extra AI Features
-    # -------------------------------------------------
-
-    if claims is not None:
-
-        response["claims"] = claims
-
-    if themes is not None:
-
-        response["themes"] = themes
-
-    if contradictions is not None:
-
-        response["contradictions"] = contradictions
-
-    if brief is not None:
-
-        response["research_brief"] = brief
-
-    if exports is not None:
-
-        response["exports"] = exports
-
-    return response
-
-
-# =====================================================
-# HEALTH
-# =====================================================
-
-@router.get("/health")
-def health():
-
-    return {
-
-        "status": "healthy",
-
-        "retriever": "Hybrid Retrieval",
-
-        "llm": "Ollama",
-
-        "services": {
-
-            "question_answering": True,
-
-            "summary": True,
-
-            "comparison": True,
-
-            "claims": True,
-
-            "themes": True,
-
-            "contradictions": True,
-
-            "research_brief": True,
-
-            "markdown_export": True
-
-        }
-
-    }
-
-
-# =====================================================
-# INFO
-# =====================================================
-
-@router.get("/info")
-def info():
-
-    return {
-
-        "project": "Multi Document Research Summarizer",
-
-        "version": "3.0",
-
-        "retrieval": "Hybrid Retrieval",
-
-        "vector_database": "ChromaDB",
-
-        "keyword_search": "BM25",
-
-        "embedding": "SentenceTransformer",
-
-        "llm": "Ollama",
-
-        "features": [
-
-            "Multi PDF Upload",
-
-            "OCR Extraction",
-
-            "Hybrid Retrieval",
-
-            "Question Answering",
-
-            "Executive Summary",
-
-            "Document Comparison",
-
-            "Key Claim Extraction",
-
-            "Theme Clustering",
-
-            "Contradiction Detection",
-
-            "Research Brief Generation",
-
-            "Markdown Export",
-
-            "HTML Export",
-
-            "Source Attribution",
-
-            "Confidence Scores"
-
-        ]
-
-    }

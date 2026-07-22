@@ -59,7 +59,7 @@ OLLAMA_KEEP_ALIVE = "30m"
 # EMBEDDING MODEL
 # ==========================================================
 
-EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
+EMBEDDING_MODEL = "sentence-transformers/static-retrieval-mrl-en-v1"
 
 EMBEDDING_BATCH_SIZE = 64
 

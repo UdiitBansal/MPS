@@ -128,7 +128,7 @@ class BM25Store:
 
             return []
 
-        query = query.strip()
+        query = query.lower().strip()
 
         if not query:
 

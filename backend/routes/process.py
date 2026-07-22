@@ -3,7 +3,7 @@ from time import perf_counter
 from fastapi import APIRouter
 
 from backend.indexes.document_index import index
-
+from backend.services.summarizer import Summarizer
 from backend.config import (
     OLLAMA_MODEL,
     EMBEDDING_MODEL,
@@ -15,6 +15,7 @@ router = APIRouter(
     prefix="/process",
     tags=["Processing"]
 )
+summarizer = Summarizer()
 
 
 @router.post("/")
@@ -23,13 +24,21 @@ def process_documents():
     start = perf_counter()
 
     result = index.build()
+    if result.get("status") == "success":
+        summary_result = summarizer.generate_summary(
+            index.documents
+        )
+        index.executive_summary = summary_result["executive_summary"]
+        index.document_summaries = summary_result["document_summaries"]
 
-    end = perf_counter()
+        result["executive_summary"] = index.executive_summary
 
-    processing_time = round(
-        end - start,
-        2
-    )
+        result["document_summaries"] = index.document_summaries
+
+        end = perf_counter()
+        processing_time = round(
+            end - start,2
+        )
 
     result["processing_time"] = processing_time
 
@@ -69,7 +78,12 @@ def processing_stats():
 
         "status": "success",
 
-        "documents": len(index.metadata),
+        "documents": len(
+            {
+                doc["source"]
+                for doc in index.documents
+            }
+        ),
 
         "chunks": len(index.all_chunks),
 
@@ -85,6 +99,9 @@ def processing_stats():
 
         "chunk_size": CHUNK_SIZE,
 
-        "chunk_overlap": CHUNK_OVERLAP
+        "chunk_overlap": CHUNK_OVERLAP,
+        "executive_summary_ready": index.executive_summary is not None,
+
+        "document_summaries": len(index.document_summaries)
 
     }

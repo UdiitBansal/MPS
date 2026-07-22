@@ -1,4 +1,5 @@
 import requests
+import re
 
 from backend.config import (
     OLLAMA_HOST,
@@ -125,20 +126,24 @@ class OllamaService:
 
     @staticmethod
     def trim_context(context):
-
         if len(context) <= MAX_CONTEXT_CHARACTERS:
-
             return context
-
-        return context[:MAX_CONTEXT_CHARACTERS]
-
+        trimmed = context[:MAX_CONTEXT_CHARACTERS]
+        last_break = trimmed.rfind("\n")
+        if last_break > 0:
+            return trimmed[:last_break]
+        return trimmed
     # ======================================================
     # Prompt Builder
     # ======================================================
-
     @staticmethod
-    def build_prompt(question, context, instructions):
-
+    def build_prompt(question, context, instructions, allow_fallback=True):
+        fallback_instruction = ""
+        if allow_fallback:
+            fallback_instruction = """
+            If the requested information is unavailable, reply exactly:
+            I could not find the answer in the uploaded documents.
+            """
         return f"""
 You are an AI Research Assistant.
 
@@ -157,9 +162,16 @@ Never mention:
 - Metadata
 - Internal IDs
 
-If information is unavailable reply exactly:
+{fallback_instruction}
 
-I could not find the answer in the uploaded documents.
+General Rules:
+
+- If different PDFs contain different or conflicting information, keep them separate.
+- Never merge conflicting statements.
+- Mention the PDF name whenever possible.
+- Do not create facts that are not present in the context.
+- Keep the response clear, professional, and well-structured.
+- Use Markdown formatting whenever appropriate.
 
 ==================================================
 CONTEXT
@@ -272,39 +284,46 @@ Rules:
         # --------------------------------------------------
 
         if flags["summary"]:
-
             return (
                 SUMMARY_MAX_TOKENS,
-                """
-Generate a document-wise summary.
+        """
+Generate a concise document-wise summary.
 
-Format:
+Output in this exact Markdown format:
 
 # Executive Summary
+Provide a brief overall summary.
 
-For EACH PDF include
+## <PDF Name>
 
-## PDF Name
+### Purpose
+- ...
 
-Purpose
+### Main Topics
+- ...
 
-Main Topics
+### Important Points
+- ...
 
-Important Points
+### Key Findings
+- ...
 
-Key Findings
-
-Finish with
+Repeat the above structure for every uploaded PDF.
 
 # Overall Summary
+Provide a concise conclusion covering all PDFs.
 
-Rules
-
-- Never mix documents.
+Rules:
+- Use ONLY the supplied context.
 - Never invent information.
-- Use markdown headings.
+- Never merge different PDFs.
+- Mention the PDF name for every section.
+- Use proper Markdown headings.
+- Use bullet points instead of blank lines.
+- Do NOT insert extra empty lines between headings.
 """
-            )
+        )
+            
 
         # --------------------------------------------------
         # Comparison
@@ -327,16 +346,16 @@ Format
 
 # Comparison Table
 
+| Feature | PDF 1 | PDF 2 |
+
 # Conclusion
 
 Rules
 
 - Mention every PDF.
-- Use markdown table.
 - Never invent information.
-- Do NOT say
-'I could not find the answer'
-if documents exist.
+- Do not merge conflicting statements.
+- Base every comparison only on the supplied context.
 """
             )
 
@@ -480,16 +499,18 @@ I could not find the answer in the uploaded documents.
         context = self.trim_context(context)
 
         num_predict, instructions = self.get_prompt(question)
-
-        prompt = self.build_prompt(
-
-            question,
-
-            context,
-
-            instructions
-
+        
+        flags = self.detect_query(question)
+        allow_fallback = not (
+            flags["summary"] or
+            flags["compare"] or
+            flags["claims"] or
+            flags["themes"] or
+            flags["contradictions"] or
+            flags["report"]
         )
+        prompt = self.build_prompt(
+            question,context,instructions,allow_fallback)
 
         payload = {
 
@@ -542,19 +563,12 @@ I could not find the answer in the uploaded documents.
             )
 
             response.raise_for_status()
-
             data = response.json()
-            print("\n========== OLLAMA RESPONSE ==========")
-            print(data)
+            raw_response = data.get("response", "")
+            print("\n========== RAW AI RESPONSE ==========")
+            print(repr(raw_response))
             print("=====================================")
-
-            answer = data.get(
-
-                "response",
-
-                ""
-
-            ).strip()
+            answer = raw_response.strip()
 
             if not answer:
 
@@ -563,33 +577,19 @@ I could not find the answer in the uploaded documents.
             # ------------------------------------------
             # Cleanup
             # ------------------------------------------
+            answer = answer.replace("Answer:", "")
+            answer = answer.replace("ANSWER:", "")
 
-            answer = answer.replace(
+# Normalize line endings
+            answer = answer.replace("\r\n", "\n")
 
-                "Answer:",
+# Remove trailing spaces from each line
+            answer = "\n".join(line.rstrip() for line in answer.splitlines())
 
-                ""
-
-            ).replace(
-
-                "ANSWER:",
-
-                ""
-
-            ).strip()
-
-            while "\n\n\n" in answer:
-
-                answer = answer.replace(
-
-                    "\n\n\n",
-
-                    "\n\n"
-
-                )
-
+# Collapse 3 or more blank lines into a single blank line
+            answer = re.sub(r"\n{3,}", "\n\n", answer)
+            answer = answer.strip()
             if len(answer) > 5:
-
                 return answer
 
             return "I could not find the answer in the uploaded documents."

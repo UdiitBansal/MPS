@@ -31,6 +31,7 @@ class DocumentIndex:
         self.all_chunks = []
 
         self.metadata = []
+        self.ready = False
 
     # =====================================================
     # Process Single PDF
@@ -91,14 +92,16 @@ class DocumentIndex:
                 pdf_metadata.append(
 
                     {
-
                         "source": pdf.name,
-
                         "page": page_number,
-
-                        "chunk": chunk_number
-
+                        "chunk": chunk_number,
+                        "total_pages": total_pages,
+                        "document_id": pdf.stem,
+                        "chunk_length": len(chunk),
+                        "indexed_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "title": pdf.stem
                     }
+
 
                 )
 
@@ -131,6 +134,7 @@ class DocumentIndex:
         self.all_chunks.clear()
 
         self.metadata.clear()
+        self.ready = False
 
         pdf_files = sorted(
 
@@ -247,6 +251,7 @@ class DocumentIndex:
             self.metadata
 
         )
+        self.ready = True
 
         processing_time = round(
 
@@ -289,6 +294,10 @@ class DocumentIndex:
             "ready_for_chat": True
 
         }
+    def has_documents(self):
+        return len(self.all_chunks) > 0
+    def is_ready(self):
+        return self.ready
 
 
 index = DocumentIndex()
