@@ -21,9 +21,7 @@ from backend.services.bm25_store import BM25Store
 class DocumentIndex:
 
     def __init__(self):
-
         self.embedder = EmbeddingModel()
-
         self.chroma = ChromaStore()
 
         self.bm25 = BM25Store()
@@ -31,7 +29,12 @@ class DocumentIndex:
         self.all_chunks = []
 
         self.metadata = []
+
         self.ready = False
+
+    # Add these
+        self.executive_summary = None
+        self.document_summaries = []
 
     # =====================================================
     # Process Single PDF
@@ -135,6 +138,8 @@ class DocumentIndex:
 
         self.metadata.clear()
         self.ready = False
+        self.executive_summary = None
+        self.document_summaries = []
 
         pdf_files = sorted(
 

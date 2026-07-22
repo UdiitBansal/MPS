@@ -49,7 +49,7 @@ ALLOWED_ORIGINS = [
 
 OLLAMA_HOST = "http://localhost:11434"
 
-OLLAMA_MODEL = "llama3.2:3b"
+OLLAMA_MODEL = "llama3.2:latest"
 
 OLLAMA_TIMEOUT = 300
 

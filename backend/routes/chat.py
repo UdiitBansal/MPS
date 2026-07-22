@@ -443,6 +443,7 @@ def chat(request: ChatRequest):
         max_chunks = determine_chunk_limit(query_type)
 
         retrieved_chunks = retriever.search(question)
+        retrieved_chunks = retrieved_chunks[:max_chunks]
 
         if not retrieved_chunks:
 
@@ -522,7 +523,7 @@ def chat(request: ChatRequest):
             answer = ollama.generate(
                 question=question,
                 context=context
-            )
+            ) or ""
 
         # =====================================================
         # CLAIM EXTRACTION
