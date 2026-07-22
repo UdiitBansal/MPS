@@ -89,12 +89,9 @@ href="style.css">
 
         </a>
 
-        <a href="#analytics">
-
-            <i class="fa-solid fa-chart-simple"></i>
-
-            Analytics
-
+        <a href="#chatHistory">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+             History
         </a>
 
     </nav>
@@ -154,25 +151,45 @@ href="style.css">
             and lets you chat with your documents.
 
         </p>
-
-        <div class="hero-buttons">
-
-            <button id="heroUploadBtn" class="primary-btn">
-
-                <i class="fa-solid fa-upload"></i>
-
-                Upload PDFs
-
+        <div class="hero-buttons" style="display:flex;gap:18px;align-items:center;justify-content:flex-start;margin-top:35px;">
+            <button
+            onclick="location.href='#learnMore'"
+            style="width:200px;height:56px;
+            border:none;
+               border-radius:14px;
+               background:#ffffff;
+               color:#2563eb;
+               font-size:16px;
+               font-weight:600;
+               cursor:pointer;
+               display:flex;
+               align-items:center;
+               justify-content:center;
+               gap:10px;
+               box-shadow:0 10px 25px rgba(0,0,0,.12);
+               transition:all .3s ease;">
+               <i class="fa-solid fa-book-open"></i>
+               Learn More
             </button>
-
-            <button class="secondary-btn">
-
-                <i class="fa-solid fa-circle-info"></i>
-
-                Learn More
-
+            <button
+            onclick="location.href='#contact'"
+            style="width:200px;height:56px;
+               border:2px solid rgba(255,255,255,.35);
+               border-radius:14px;
+               background:rgba(255,255,255,.15);
+               backdrop-filter:blur(10px);
+               color:#ffffff;
+               font-size:16px;
+               font-weight:600;
+               cursor:pointer;
+               display:flex;
+               align-items:center;
+               justify-content:center;
+               gap:10px;
+               transition:all .3s ease;">
+               <i class="fa-solid fa-envelope"></i>
+               Contact Us
             </button>
-
         </div>
 
     </div>
@@ -355,45 +372,7 @@ href="style.css">
 
     </div>
 
-    <div class="card" id="process">
-
-        <div class="card-header">
-
-            <i class="fa-solid fa-gears"></i>
-
-            <h2>Processing Status</h2>
-
-        </div>
-
-        <p class="description">
-
-            Uploading →
-            OCR →
-            Chunking →
-            Embeddings →
-            ChromaDB →
-            BM25 →
-            AI Summary
-
-        </p>
-
-        <div id="processStatus">
-
-            Waiting for Upload...
-
-        </div>
-
-        <div class="progress-wrapper">
-
-            <div class="progress-bar">
-
-                <div id="progressFill"></div>
-
-            </div>
-
-        </div>
-
-    </div>
+    
 
     <div class="card">
 
@@ -742,227 +721,6 @@ href="style.css">
 
 </section>
 
-<!-- ========================= -->
-<!-- WORKFLOW -->
-<!-- ========================= -->
-
-<section class="workflow-section">
-
-    <div class="section-title">
-
-        <h2>
-
-            <i class="fa-solid fa-diagram-project"></i>
-
-            AI Processing Workflow
-
-        </h2>
-
-        <p>
-
-            Automatic Multi Document Pipeline
-
-        </p>
-
-    </div>
-
-    <div class="workflow">
-
-        <div class="workflow-card">
-
-            <i class="fa-solid fa-upload"></i>
-
-            <span>Upload</span>
-
-        </div>
-
-        <div class="workflow-arrow">
-
-            <i class="fa-solid fa-arrow-right"></i>
-
-        </div>
-
-        <div class="workflow-card">
-
-            <i class="fa-solid fa-file-lines"></i>
-
-            <span>OCR</span>
-
-        </div>
-
-        <div class="workflow-arrow">
-
-            <i class="fa-solid fa-arrow-right"></i>
-
-        </div>
-
-        <div class="workflow-card">
-
-            <i class="fa-solid fa-scissors"></i>
-
-            <span>Chunking</span>
-
-        </div>
-
-        <div class="workflow-arrow">
-
-            <i class="fa-solid fa-arrow-right"></i>
-
-        </div>
-
-        <div class="workflow-card">
-
-            <i class="fa-solid fa-brain"></i>
-
-            <span>Embeddings</span>
-
-        </div>
-
-        <div class="workflow-arrow">
-
-            <i class="fa-solid fa-arrow-right"></i>
-
-        </div>
-
-        <div class="workflow-card">
-
-            <i class="fa-solid fa-database"></i>
-
-            <span>ChromaDB</span>
-
-        </div>
-
-        <div class="workflow-arrow">
-
-            <i class="fa-solid fa-arrow-right"></i>
-
-        </div>
-
-        <div class="workflow-card">
-
-            <i class="fa-solid fa-layer-group"></i>
-
-            <span>BM25</span>
-
-        </div>
-
-        <div class="workflow-arrow">
-
-            <i class="fa-solid fa-arrow-right"></i>
-
-        </div>
-
-        <div class="workflow-card">
-
-            <i class="fa-solid fa-robot"></i>
-
-            <span>Ollama</span>
-
-        </div>
-
-        <div class="workflow-arrow">
-
-            <i class="fa-solid fa-arrow-right"></i>
-
-        </div>
-
-        <div class="workflow-card">
-
-            <i class="fa-solid fa-file-lines"></i>
-
-            <span>Summary</span>
-
-        </div>
-
-    </div>
-
-</section>
-
-<!-- ========================= -->
-<!-- TECHNOLOGY -->
-<!-- ========================= -->
-
-<section class="technology-section">
-
-    <div class="section-title">
-
-        <h2 style="color:white">
-
-            Technology Stack
-
-        </h2>
-
-    </div>
-
-    <div class="technology-grid">
-
-        <div class="technology-card">
-
-            <i class="fa-brands fa-python"></i>
-
-            <h3>Python</h3>
-
-        </div>
-
-        <div class="technology-card">
-
-            <i class="fa-solid fa-bolt"></i>
-
-            <h3>FastAPI</h3>
-
-        </div>
-
-        <div class="technology-card">
-
-            <i class="fa-solid fa-database"></i>
-
-            <h3>ChromaDB</h3>
-
-        </div>
-
-        <div class="technology-card">
-
-            <i class="fa-solid fa-layer-group"></i>
-
-            <h3>BM25</h3>
-
-        </div>
-
-        <div class="technology-card">
-
-            <i class="fa-solid fa-brain"></i>
-
-            <h3>Sentence Transformers</h3>
-
-        </div>
-
-        <div class="technology-card">
-
-            <i class="fa-solid fa-robot"></i>
-
-            <h3>Ollama</h3>
-
-        </div>
-
-        <div class="technology-card">
-
-            <i class="fa-solid fa-eye"></i>
-
-            <h3>EasyOCR</h3>
-
-        </div>
-
-        <div class="technology-card">
-
-            <i class="fa-brands fa-js"></i>
-
-            <h3>JavaScript</h3>
-
-        </div>
-
-    </div>
-
-</section>
 
 <!-- =========================
      FOOTER
