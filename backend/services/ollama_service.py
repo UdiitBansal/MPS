@@ -1,6 +1,8 @@
 import requests
 import re
+import logging
 
+logger = logging.getLogger(__name__)
 from backend.config import (
     OLLAMA_HOST,
     OLLAMA_MODEL,
@@ -289,10 +291,19 @@ Rules:
         """
 Generate a concise document-wise summary.
 
-Output in this exact Markdown format:
+First determine how many unique PDF documents are present in the supplied context.
+
+Generate ONE section for EACH unique PDF only.
+
+Do NOT create duplicate sections.
+
+Do NOT assume additional PDFs exist.
+
+Output exactly in this format:
 
 # Executive Summary
-Provide a brief overall summary.
+
+Provide a brief overall summary of all uploaded PDF documents.
 
 ## <PDF Name>
 
@@ -308,19 +319,19 @@ Provide a brief overall summary.
 ### Key Findings
 - ...
 
-Repeat the above structure for every uploaded PDF.
+Repeat ONLY for the PDFs that actually exist in the supplied context.
 
 # Overall Summary
-Provide a concise conclusion covering all PDFs.
+
+Provide a short conclusion covering all uploaded PDFs.
 
 Rules:
 - Use ONLY the supplied context.
 - Never invent information.
-- Never merge different PDFs.
-- Mention the PDF name for every section.
-- Use proper Markdown headings.
-- Use bullet points instead of blank lines.
-- Do NOT insert extra empty lines between headings.
+- Never create summaries for missing PDFs.
+- Never duplicate the same PDF.
+- Mention the exact PDF filename.
+- Use Markdown headings and bullet points.
 """
         )
             
@@ -563,11 +574,12 @@ I could not find the answer in the uploaded documents.
             )
 
             response.raise_for_status()
-            data = response.json()
+            try:
+                 data = response.json()
+            except ValueError:
+                return "Invalid response received from Ollama."
             raw_response = data.get("response", "")
-            print("\n========== RAW AI RESPONSE ==========")
-            print(repr(raw_response))
-            print("=====================================")
+            logger.debug("Raw AI Response: %s", repr(raw_response))
             answer = raw_response.strip()
 
             if not answer:
@@ -577,8 +589,7 @@ I could not find the answer in the uploaded documents.
             # ------------------------------------------
             # Cleanup
             # ------------------------------------------
-            answer = answer.replace("Answer:", "")
-            answer = answer.replace("ANSWER:", "")
+            answer = re.sub(r"^answer:\s*","",answer,flags=re.IGNORECASE)
 
 # Normalize line endings
             answer = answer.replace("\r\n", "\n")

@@ -41,7 +41,6 @@ class Retriever:
         }
 
         self.compare_keywords = {
-
             "compare",
             "comparison",
             "difference",
@@ -54,8 +53,21 @@ class Retriever:
             "same",
             "unique",
             "versus",
-            "vs"
+            "vs",
 
+            "highest",
+            "lowest",
+            "top",
+            "best",
+            "maximum",
+            "minimum",
+            "marks",
+            "mark",
+            "score",
+            "scores",
+            "percentage",
+            "rank",
+            "total"
         }
 
         self.claim_keywords = {

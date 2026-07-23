@@ -1,6 +1,7 @@
 from time import perf_counter
+import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from backend.indexes.document_index import index
 from backend.config import (
@@ -10,6 +11,8 @@ from backend.config import (
     CHUNK_OVERLAP,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(
     prefix="/process",
     tags=["Processing"]
@@ -18,22 +21,27 @@ router = APIRouter(
 
 @router.post("/")
 def process_documents():
+
     start = perf_counter()
 
     try:
         result = index.build()
 
-        end = perf_counter()
-        processing_time = round(end - start, 2)
+        processing_time = round(perf_counter() - start, 2)
+
+        if not isinstance(result, dict):
+            raise ValueError("Invalid response received from document index.")
 
         result["processing_time"] = processing_time
-        result["model"] = OLLAMA_MODEL
-        result["embedding_model"] = EMBEDDING_MODEL
-        result["chunk_size"] = CHUNK_SIZE
-        result["chunk_overlap"] = CHUNK_OVERLAP
-        result["index_type"] = "Hybrid Retrieval"
-        result["vector_database"] = "ChromaDB"
-        result["keyword_search"] = "BM25"
+
+        result.setdefault("model", OLLAMA_MODEL)
+        result.setdefault("embedding_model", EMBEDDING_MODEL)
+        result.setdefault("chunk_size", CHUNK_SIZE)
+        result.setdefault("chunk_overlap", CHUNK_OVERLAP)
+
+        result.setdefault("index_type", "Hybrid Retrieval")
+        result.setdefault("vector_database", "ChromaDB")
+        result.setdefault("keyword_search", "BM25")
 
         if result.get("status") == "success":
             result["message"] = "Documents processed successfully."
@@ -41,15 +49,22 @@ def process_documents():
         else:
             result["ready_for_chat"] = False
 
-        print(result)
+        logger.info(result)
+
         return result
 
     except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e),
-            "ready_for_chat": False
-        }
+
+        logger.exception("Document processing failed")
+
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": str(e),
+                "ready_for_chat": False
+            }
+        )
 
 
 @router.get("/stats")
@@ -59,14 +74,13 @@ def processing_stats():
     document_summaries = getattr(index, "document_summaries", [])
 
     return {
+
         "status": "success",
 
-        "documents": len(
-            {
-                doc["source"]
-                for doc in index.documents
-            }
-        ),
+        "documents": len({
+            doc["source"]
+            for doc in index.documents
+        }),
 
         "chunks": len(index.all_chunks),
 
@@ -81,5 +95,6 @@ def processing_stats():
         "chunk_overlap": CHUNK_OVERLAP,
 
         "executive_summary_ready": executive_summary is not None,
+
         "document_summaries": len(document_summaries),
     }

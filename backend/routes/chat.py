@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from backend.indexes.document_index import index
 
 from backend.services.retriever import Retriever
+from backend.services.result_analyzer import ResultAnalyzer
 from backend.services.ollama_service import OllamaService
 from backend.services.claim_extractor import ClaimExtractor
 from backend.services.theme_extractor import ThemeExtractor
@@ -87,7 +88,19 @@ COMPARE_KEYWORDS = {
     "similarity",
     "similarities",
     "contrast",
-    "common"
+    "common",
+
+    "highest",
+    "lowest",
+    "top",
+    "maximum",
+    "minimum",
+    "marks",
+    "score",
+    "scores",
+    "percentage",
+    "rank",
+    "best"
 }
 
 CLAIM_KEYWORDS = {
@@ -183,9 +196,9 @@ def detect_query_type(question: str) -> str:
 def determine_chunk_limit(query_type: str) -> int:
 
     limits = {
-        "question": 8,
-        "summary": 20,
-        "comparison": 15,
+        "question": 15,
+        "summary": 50,
+        "comparison": 50,
         "claims": 15,
         "themes": 20,
         "contradictions": 20,
@@ -228,7 +241,7 @@ def build_context(retrieved_chunks, max_chunks):
 
     grouped = group_chunks_by_document(retrieved_chunks)
 
-    MAX_CHUNKS_PER_DOCUMENT = 3
+    MAX_CHUNKS_PER_DOCUMENT = 20
 
     total = 0
 
@@ -351,7 +364,7 @@ def chat(request: ChatRequest):
 
         q = question.lower()
 
-        if q in GREETINGS:
+        if any(word in q for word in GREETINGS):
 
             if index.is_ready():
 
@@ -389,7 +402,7 @@ def chat(request: ChatRequest):
                 "total_sources": 0
             }
 
-        if q in THANKS:
+        if any(word in q for word in THANKS):
 
             return {
                 "status": "success",
@@ -401,7 +414,7 @@ def chat(request: ChatRequest):
                 "total_sources": 0
             }
 
-        if q in GOODBYE:
+        if any(word in q for word in GOODBYE):
 
             return {
                 "status": "success",
@@ -442,7 +455,17 @@ def chat(request: ChatRequest):
 
         max_chunks = determine_chunk_limit(query_type)
 
+        if retriever is None:
+            raise RuntimeError("Retriever service is unavailable.")
         retrieved_chunks = retriever.search(question)
+        analyzer = ResultAnalyzer(
+            [chunk["text"] for chunk in retrieved_chunks],
+            retrieved_chunks
+        )
+        print("=" * 60)
+        for chunk in retrieved_chunks:
+            print(chunk["source"], chunk.get("page"), chunk["text"][:200])
+            print("=" * 60)
         retrieved_chunks = retrieved_chunks[:max_chunks]
 
         if not retrieved_chunks:
@@ -513,65 +536,53 @@ def chat(request: ChatRequest):
 
         # =====================================================
         # AI PROCESSING STARTS HERE
-        # =====================================================
-                # =====================================================
-        # QUESTION / SUMMARY / COMPARISON
-        # =====================================================
-
         if query_type in ("question", "summary", "comparison"):
-
-            answer = ollama.generate(
-                question=question,
-                context=context
-            ) or ""
-
-        # =====================================================
-        # CLAIM EXTRACTION
-        # =====================================================
+            question_lower = question.lower()
+            if "topper" in question_lower:
+                result = analyzer.topper()
+                if result:
+                    answer = (
+                        f"Topper: {result['name']}\n"
+                        f"Marks: {result['total']}"
+                    )
+                else:
+                    answer = "No result found."
+            elif "maximum" in question_lower or "highest" in question_lower:
+                result = analyzer.max_marks()
+                if result:
+                    answer = (
+                        f"Highest Marks: {result['total']}\n"
+                        f"Student: {result['name']}"
+                    )
+                else:
+                    answer = "No result found."
+            elif "how many student" in question_lower:
+                answer = f"Total Students: {analyzer.student_count()}"
+            elif "pass" in question_lower:
+                answer = f"Passed Students: {analyzer.pass_count()}"
+            else:
+                answer = ollama.generate(
+                    question=question,
+                    context=context
+                ) or ""
 
         elif query_type == "claims":
-
             claims = claim_extractor.extract(documents)
-
             answer = claim_extractor.to_markdown(claims)
-
-        # =====================================================
-        # THEME EXTRACTION
-        # =====================================================
-
         elif query_type == "themes":
-
             themes = theme_extractor.extract(documents)
-
             answer = theme_extractor.to_markdown(themes)
-
-        # =====================================================
-        # CONTRADICTION DETECTION
-        # =====================================================
-
         elif query_type == "contradictions":
-
-            contradictions = contradiction_detector.detect(
-                documents
-            )
-
+            contradictions = contradiction_detector.detect(documents)
             answer = contradiction_detector.to_markdown(
                 contradictions
             )
-
-        # =====================================================
-        # RESEARCH REPORT
-        # =====================================================
-
         elif query_type == "report":
-
             logger.info("Generating Executive Summary...")
-
             summary = ollama.generate(
                 question="Generate a comprehensive executive summary.",
                 context=context
             )
-
             logger.info("Extracting Claims...")
             claims = claim_extractor.extract(documents)
 
@@ -579,9 +590,7 @@ def chat(request: ChatRequest):
             themes = theme_extractor.extract(documents)
 
             logger.info("Detecting Contradictions...")
-            contradictions = contradiction_detector.detect(
-                documents
-            )
+            contradictions = contradiction_detector.detect(documents)
 
             logger.info("Generating Research Brief...")
 
@@ -591,23 +600,20 @@ def chat(request: ChatRequest):
                 themes=themes,
                 contradictions=contradictions
             )
-
             answer = brief
 
             logger.info("Exporting Report...")
-
-            exports = report_exporter.export(brief)
-
-        # =====================================================
-        # DEFAULT
-        # =====================================================
+            try:
+                exports = report_exporter.export(brief)
+            except Exception:
+                logger.exception("Report export failed")
+                exports = None
 
         else:
-
             answer = ollama.generate(
                 question=question,
                 context=context
-            )
+            ) or ""
 
         # =====================================================
         # FALLBACK

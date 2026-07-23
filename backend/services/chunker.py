@@ -2,7 +2,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from backend.config import (
     CHUNK_SIZE,
-    CHUNK_OVERLAP
+    CHUNK_OVERLAP,
+    MIN_CHUNK_LENGTH as CONFIG_MIN_CHUNK_LENGTH
 )
 
 
@@ -40,7 +41,7 @@ class Chunker:
 
     )
 
-    MIN_CHUNK_LENGTH = 50
+    MIN_CHUNK_LENGTH = CONFIG_MIN_CHUNK_LENGTH
 
     @classmethod
     def split(cls, text):

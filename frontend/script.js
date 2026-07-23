@@ -299,7 +299,7 @@ async function uploadPDFs(){
 
         uploadStatus.innerHTML="Upload Failed";
 
-        showToast("Backend Not Running","#ef4444");
+        showToast("Upload Maximum 5 PDFs","#ef4444");
 
     }
 
@@ -310,8 +310,9 @@ async function uploadPDFs(){
 // =====================================================
 
 async function processDocuments(){
-
-    processStatus.innerHTML="Processing Documents...";
+    if(processStatus){
+        processStatus.innerHTML="Processing Documents...";
+    }
 
     showLoading("Extracting Text...");
 
@@ -354,8 +355,9 @@ async function processDocuments(){
             progressFill.style.width="100%";
 
         }
-
-        processStatus.innerHTML="✅ Documents Processed";
+        if(processStatus){
+            processStatus.innerHTML="✅ Documents Processed";
+        }
 
         if(chunkCount){
 
@@ -406,8 +408,9 @@ async function processDocuments(){
         hideLoading();
 
         uploadBtn.disabled=false;
-
-        processStatus.innerHTML="Processing Failed";
+        if(processStatus){
+            processStatus.innerHTML="Processing Failed";
+        }
 
         showToast("Processing Failed","#ef4444");
 
@@ -418,12 +421,15 @@ async function processDocuments(){
 // =====================================================
 // PART 2 STARTS FROM HERE
 // =====================================================
+
 // =====================================================
 // GENERATE EXECUTIVE SUMMARY
 // =====================================================
 
 async function generateSummary() {
+    console.log("generateSummary() called");
 
+    // Show loading in AI Response
     answer.innerHTML = `
     <div class="ai-response">
         <div class="loader"></div>
@@ -446,8 +452,7 @@ async function generateSummary() {
 
             body: JSON.stringify({
 
-                question:
-                "Generate a complete executive summary of all uploaded PDF documents."
+                question: "Generate a complete executive summary of all uploaded PDF documents."
 
             })
 
@@ -457,11 +462,35 @@ async function generateSummary() {
 
         console.log("SUMMARY RESPONSE:", data);
 
-        displayAnswer(data.answer);
+        // -------------------------------
+        // Display in AI Response panel
+        // -------------------------------
+        console.log("Answer:", data.answer);
+        console.log("Summary:", data.summary);
+        const summary = data.summary || data.answer;
+        displayAnswer(summary);
+        const summaryBox = document.getElementById("summaryBox");
+        if (summaryBox) {
+            summaryBox.innerHTML = `
+            <div class="answer-text">
+            ${marked.parse(summary)}
+        </div>
+        `;
+    }
 
+        
+        
+
+        // -------------------------------
+        // Display retrieved sources
+        // -------------------------------
         displaySources(data.sources);
+
         scrollToAnswer();
 
+        // -------------------------------
+        // Save in chat history
+        // -------------------------------
         chatHistory.push({
 
             question: "Executive Summary",
@@ -482,15 +511,25 @@ async function generateSummary() {
 
         answer.innerHTML = `
         <div class="ai-response">
-
             <h2 style="color:red">
-
                 Unable to Generate Executive Summary
-
             </h2>
-
         </div>
         `;
+
+        // Also update Executive Summary box
+        const summaryBox = document.getElementById("summaryBox");
+
+        if (summaryBox) {
+
+            summaryBox.innerHTML = `
+                <div class="welcome-box">
+                    <h3>Summary Generation Failed</h3>
+                    <p>Please try uploading the documents again.</p>
+                </div>
+            `;
+
+        }
 
         showToast("Summary Generation Failed", "#ef4444");
 
@@ -1002,9 +1041,6 @@ document.addEventListener("keydown", (e) => {
         askAI();
 
     }
-
-    // Escape → Clear
-
     if (e.key === "Escape") {
 
         clearAll();
@@ -1056,11 +1092,6 @@ if (answer) {
     `;
 
 }
-
-// =====================================================
-// INITIALIZE HISTORY
-// =====================================================
-
 updateHistory();
 
 // =====================================================

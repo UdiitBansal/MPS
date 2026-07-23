@@ -29,6 +29,7 @@ class DocumentIndex:
         self.all_chunks = []
 
         self.metadata = []
+        self.documents = []
 
         self.ready = False
 
@@ -73,6 +74,10 @@ class DocumentIndex:
                 continue
 
             chunks = Chunker.split(page_text)
+            print(f"\nPage {page_number}")
+            for i, c in enumerate(chunks, 1):
+                print(f"\nChunk {i}")
+                print(c[:500])
 
             for chunk in chunks:
 
@@ -135,6 +140,7 @@ class DocumentIndex:
         start_time = time.time()
 
         self.all_chunks.clear()
+        self.documents.clear()
 
         self.metadata.clear()
         self.ready = False
@@ -188,6 +194,7 @@ class DocumentIndex:
             self.metadata.extend(metadata)
 
             total_pages += pages
+        self.documents = self.metadata.copy()
 
         if not self.all_chunks:
 
@@ -207,11 +214,15 @@ class DocumentIndex:
 
         print("\nGenerating Embeddings...")
 
-        embeddings = self.embedder.encode(
-
-            self.all_chunks
-
-        )
+        try:
+            embeddings = self.embedder.encode(
+                self.all_chunks
+            )
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Embedding generation failed: {e}"
+            }
 
         if len(embeddings) == 0:
 
@@ -226,7 +237,7 @@ class DocumentIndex:
         # =====================================================
         # Chroma
         # =====================================================
-
+        
         print("Resetting ChromaDB...")
 
         self.chroma.reset_collection()

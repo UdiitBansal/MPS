@@ -12,14 +12,23 @@ class HybridRetriever:
     # =====================================================
     # Hybrid Retrieval
     # =====================================================
-
     def retrieve(self, query, top_k=10):
-
         query = " ".join(query.strip().split())
-
-        if not query:
-
-            return []
+        q = query.lower()
+        if any(word in q for word in [
+            "highest",
+            "lowest",
+            "top",
+            "maximum",
+            "minimum",
+            "marks",
+            "score",
+            "percentage",
+            "rank"
+        ]):
+             query = query + " student total marks score percentage result highest lowest"
+             if not query:
+                 return []
 
         try:
 
@@ -31,7 +40,7 @@ class HybridRetriever:
 
             return []
 
-        search_k = max(top_k * 2, 20)
+        search_k = max(top_k * 5, 50)
 
         # -------------------------------------------------
         # Chroma Semantic Search

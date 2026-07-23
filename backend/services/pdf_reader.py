@@ -1,22 +1,35 @@
-import fitz
-import easyocr
-import numpy as np
-
+import logging
 from concurrent.futures import ThreadPoolExecutor
 
+import easyocr
+import fitz
+import numpy as np
+
 from backend.config import OCR_DPI, MAX_WORKERS
+
+logger = logging.getLogger(__name__)
 
 
 class PDFReader:
 
-    print("Loading EasyOCR Model...")
+    logger.info("Loading EasyOCR Model...")
 
-    reader = easyocr.Reader(
-        ["en"],
-        gpu=False
-    )
+    try:
 
-    print("EasyOCR Ready.\n")
+        reader = easyocr.Reader(
+            ["en"],
+            gpu=False
+        )
+
+        logger.info("EasyOCR Ready.")
+
+    except Exception as e:
+
+        logger.exception("Failed to initialize EasyOCR")
+
+        raise RuntimeError(
+            f"Failed to initialize EasyOCR: {e}"
+        )
 
     @staticmethod
     def process_page(page_data):
@@ -33,24 +46,21 @@ class PDFReader:
 
             if text:
 
-                print(
-                    f"✓ Page {page_number} : Text Extracted ({len(text)} chars)"
+                logger.info(
+                    f"Page {page_number}: Text Extracted ({len(text)} chars)"
                 )
 
                 return {
-
                     "page": page_number,
-
                     "text": text
-
                 }
 
             # -----------------------------
             # OCR
             # -----------------------------
 
-            print(
-                f"Page {page_number} : Running OCR..."
+            logger.info(
+                f"Page {page_number}: Running OCR..."
             )
 
             pix = page.get_pixmap(
@@ -65,6 +75,13 @@ class PDFReader:
                 pix.width,
                 pix.n
             )
+
+            if image.size == 0:
+
+                return {
+                    "page": page_number,
+                    "text": ""
+                }
 
             # Convert grayscale to RGB
 
@@ -93,38 +110,30 @@ class PDFReader:
 
             ocr_text = "\n".join(result).strip()
 
-            print(
-                f"✓ Page {page_number} : OCR ({len(ocr_text)} chars)"
+            logger.info(
+                f"Page {page_number}: OCR ({len(ocr_text)} chars)"
             )
 
             return {
-
                 "page": page_number,
-
                 "text": ocr_text
-
             }
 
-        except Exception as e:
+        except Exception:
 
-            print(
-
-                f"✗ Page {page_number} : {e}"
-
+            logger.exception(
+                f"Failed to process page {page_number}"
             )
 
             return {
-
                 "page": page_number,
-
                 "text": ""
-
             }
 
     @staticmethod
     def read_pdf(pdf_path):
 
-        print(f"\nOpening PDF : {pdf_path}")
+        logger.info(f"Opening PDF: {pdf_path}")
 
         try:
 
@@ -132,7 +141,7 @@ class PDFReader:
 
                 total_pages = len(document)
 
-                print(f"Total Pages : {total_pages}")
+                logger.info(f"Total Pages: {total_pages}")
 
                 pages = [
 
@@ -166,12 +175,10 @@ class PDFReader:
 
                     )
 
-        except Exception as e:
+        except Exception:
 
-            print(
-
-                f"Error opening PDF : {e}"
-
+            logger.exception(
+                f"Error opening PDF: {pdf_path}"
             )
 
             return {
@@ -222,10 +229,8 @@ class PDFReader:
 
         final_text = "\n\n".join(all_text)
 
-        print(
-
-            f"\nTotal Characters Extracted : {total_chars}"
-
+        logger.info(
+            f"Total Characters Extracted: {total_chars}"
         )
 
         return {

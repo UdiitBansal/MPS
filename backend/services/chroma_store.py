@@ -1,8 +1,9 @@
 import uuid
 import chromadb
+import logging
 
 from backend.config import CHROMA_DIR
-
+logger = logging.getLogger(__name__)
 
 class ChromaStore:
 
@@ -72,6 +73,10 @@ class ChromaStore:
         if not chunks:
 
             return
+        if not (len(chunks) == len(embeddings) == len(metadata_list)):
+            raise ValueError(
+                "Chunks, embeddings and metadata counts do not match."
+            )
 
         ids = [
 
@@ -81,18 +86,18 @@ class ChromaStore:
 
         ]
 
-        self.collection.add(
+        try:
+            self.collection.add(
+                ids=ids,
+                documents=chunks,
+                embeddings=embeddings.tolist(),
+                metadatas=metadata_list
+            )
+            
 
-            ids=ids,
-
-            documents=chunks,
-
-            embeddings=embeddings.tolist(),
-
-            metadatas=metadata_list
-
-        )
-
+        except Exception as e:
+            logger.exception("Failed to add documents to ChromaDB")
+            raise RuntimeError(f"ChromaDB insert failed: {e}")
     # =====================================================
     # Search
     # =====================================================
@@ -102,33 +107,20 @@ class ChromaStore:
         embedding,
         top_k=10
     ):
-
+        
         try:
-
             result = self.collection.query(
-
                 query_embeddings=[embedding.tolist()],
-
                 n_results=top_k,
-
                 include=[
-
                     "documents",
-
                     "metadatas",
-
                     "distances"
-
                 ]
-
             )
-
         except Exception as e:
-
-            print(f"Chroma Search Error : {e}")
-
+            logger.exception("Chroma search failed")
             return []
-
         documents = result.get(
 
             "documents",
@@ -178,11 +170,9 @@ class ChromaStore:
             )
 
             if normalized in seen:
-
-                continue
-
+                 continue
             seen.add(normalized)
-
+            meta = meta or {}
             similarity = max(
 
                 0.0,

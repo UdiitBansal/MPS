@@ -119,13 +119,7 @@ href="style.css">
 
     </div>
 
-    <div class="server-status">
-
-        <span class="dot"></span>
-
-        Backend Online
-
-    </div>
+   
 
 </header>
 
@@ -153,7 +147,7 @@ href="style.css">
         </p>
         <div class="hero-buttons" style="display:flex;gap:18px;align-items:center;justify-content:flex-start;margin-top:35px;">
             <button
-            onclick="location.href='#learnMore'"
+            onclick="location.href='learn.html'"
             style="width:200px;height:56px;
             border:none;
                border-radius:14px;
@@ -172,7 +166,7 @@ href="style.css">
                Learn More
             </button>
             <button
-            onclick="location.href='#contact'"
+            onclick="location.href='contact.html'"
             style="width:200px;height:56px;
                border:2px solid rgba(255,255,255,.35);
                border-radius:14px;
@@ -197,7 +191,7 @@ href="style.css">
     <div class="hero-right">
 
         <img
-            src="assets/hero.svg2.png"
+            src="assets/4.png"
             alt="Research">
 
     </div>
@@ -331,8 +325,10 @@ href="style.css">
         </button>
 
         <div id="uploadStatus"></div>
+        <div id="processStatus"></div>
 
     </div>
+    
 
     <div class="card" id="summary">
 
@@ -653,69 +649,107 @@ href="style.css">
 </div>
 
 </section>
-<!-- ========================= -->
-<!-- FEATURES -->
-<!-- ========================= -->
+<!-- ===================================== -->
+<!-- WHY CHOOSE RESEARCH AI -->
+<!-- ===================================== -->
 
-<section class="feature-section">
+<section class="feature-wrapper">
 
-    <div class="feature-box">
+ 
 
-        <i class="fa-solid fa-file-circle-check"></i>
+    <div class="feature-section">
 
-        <h3>OCR Support</h3>
+        <!-- Card 1 -->
 
-        <p>
+        <div class="feature-box">
 
-            Automatically extracts text from scanned
-            and image-based PDF documents using EasyOCR.
+            <span class="border-animation"></span>
 
-        </p>
+            <div class="feature-icon">
 
-    </div>
+                <i class="fa-solid fa-bolt"></i>
 
-    <div class="feature-box">
+            </div>
 
-        <i class="fa-solid fa-brain"></i>
+            <h3>Fast Research</h3>
 
-        <h3>Semantic Search</h3>
+            <p>
 
-        <p>
+                Upload multiple research papers and receive
+                AI-generated summaries within seconds.
 
-            Uses Sentence Transformers together with
-            ChromaDB for intelligent semantic retrieval.
+            </p>
 
-        </p>
+        </div>
 
-    </div>
+        <!-- Card 2 -->
 
-    <div class="feature-box">
+        <div class="feature-box">
 
-        <i class="fa-solid fa-magnifying-glass"></i>
+            <span class="border-animation"></span>
 
-        <h3>Hybrid Retrieval</h3>
+            <div class="feature-icon">
 
-        <p>
+                <i class="fa-solid fa-lightbulb"></i>
 
-            Combines BM25 keyword search and vector
-            similarity search for better accuracy.
+            </div>
 
-        </p>
+            <h3>Key Insights</h3>
 
-    </div>
+            <p>
 
-    <div class="feature-box">
+                Instantly discover important findings,
+                trends, and hidden knowledge.
 
-        <i class="fa-solid fa-robot"></i>
+            </p>
 
-        <h3>AI Answers</h3>
+        </div>
 
-        <p>
+        <!-- Card 3 -->
 
-            Generates answers using Ollama only from
-            uploaded PDF documents.
+        <div class="feature-box">
 
-        </p>
+            <span class="border-animation"></span>
+
+            <div class="feature-icon">
+
+                <i class="fa-solid fa-comments"></i>
+
+            </div>
+
+            <h3>Ask Questions</h3>
+
+            <p>
+
+                Chat naturally with your uploaded documents
+                and receive accurate answers instantly.
+
+            </p>
+
+        </div>
+
+        <!-- Card 4 -->
+
+        <div class="feature-box">
+
+            <span class="border-animation"></span>
+
+            <div class="feature-icon">
+
+                <i class="fa-solid fa-chart-line"></i>
+
+            </div>
+
+            <h3>Better Decisions</h3>
+
+            <p>
+
+                Compare multiple documents and make
+                smarter research decisions using AI.
+
+            </p>
+
+        </div>
 
     </div>
 
@@ -873,11 +907,7 @@ href="style.css">
 
         <!-- Progress -->
 
-        <div class="progress-wrapper">
-
-            <div class="progress-bar"></div>
-
-        </div>
+        
 
         <!-- AI Processing Steps -->
 
@@ -954,3 +984,4 @@ href="style.css">
 </body>
 
 </html>
+  

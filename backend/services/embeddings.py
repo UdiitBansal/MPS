@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import torch
 
@@ -9,38 +10,43 @@ from backend.config import (
     NORMALIZE_EMBEDDINGS
 )
 
+logger = logging.getLogger(__name__)
+
 
 class EmbeddingModel:
 
     def __init__(self):
 
-        print("\n===================================")
-        print("Loading Embedding Model...")
-        print("===================================\n")
+        logger.info("===================================")
+        logger.info("Loading Embedding Model...")
+        logger.info("===================================")
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        print(f"Using Device : {self.device.upper()}")
+        logger.info(f"Using Device : {self.device.upper()}")
 
-        self.model = SentenceTransformer(
+        try:
 
-            EMBEDDING_MODEL,
+            self.model = SentenceTransformer(
+                EMBEDDING_MODEL,
+                device=self.device
+            )
 
-            device=self.device
+        except Exception as e:
 
-        )
+            logger.exception("Failed to load embedding model")
+
+            raise RuntimeError(
+                f"Unable to load embedding model '{EMBEDDING_MODEL}': {e}"
+            )
 
         self.embedding_dimension = (
-
             self.model.get_embedding_dimension()
-
         )
 
-        print(f"Embedding Model : {EMBEDDING_MODEL}")
-
-        print(f"Embedding Dimension : {self.embedding_dimension}")
-
-        print("\nEmbedding Model Loaded Successfully.\n")
+        logger.info(f"Embedding Model : {EMBEDDING_MODEL}")
+        logger.info(f"Embedding Dimension : {self.embedding_dimension}")
+        logger.info("Embedding Model Loaded Successfully.")
 
     # =====================================================
     # Clean Text
@@ -50,14 +56,9 @@ class EmbeddingModel:
     def clean_text(text):
 
         if not text:
-
             return ""
 
-        return " ".join(
-
-            str(text).split()
-
-        )
+        return " ".join(str(text).split())
 
     # =====================================================
     # Batch Embeddings
@@ -66,27 +67,24 @@ class EmbeddingModel:
     def encode(self, texts):
 
         if isinstance(texts, str):
-
             texts = [texts]
 
-        texts = [
+        cleaned_texts = []
 
-            self.clean_text(text)
+        for text in texts:
 
-            for text in texts
+            cleaned = self.clean_text(text)
 
-            if text and self.clean_text(text)
+            if cleaned:
+                cleaned_texts.append(cleaned)
 
-        ]
+        texts = cleaned_texts
 
         if not texts:
 
             return np.empty(
-
                 (0, self.embedding_dimension),
-
                 dtype=np.float32
-
             )
 
         try:
@@ -107,16 +105,13 @@ class EmbeddingModel:
 
             return embeddings.astype(np.float32)
 
-        except Exception as e:
+        except Exception:
 
-            print(f"Embedding Error : {e}")
+            logger.exception("Embedding generation failed")
 
             return np.empty(
-
                 (0, self.embedding_dimension),
-
                 dtype=np.float32
-
             )
 
     # =====================================================
@@ -130,11 +125,8 @@ class EmbeddingModel:
         if not query:
 
             return np.empty(
-
                 self.embedding_dimension,
-
                 dtype=np.float32
-
             )
 
         try:
@@ -153,16 +145,13 @@ class EmbeddingModel:
 
             return embedding.astype(np.float32)
 
-        except Exception as e:
+        except Exception:
 
-            print(f"Query Embedding Error : {e}")
+            logger.exception("Query embedding generation failed")
 
             return np.empty(
-
                 self.embedding_dimension,
-
                 dtype=np.float32
-
             )
 
     # =====================================================
@@ -174,18 +163,14 @@ class EmbeddingModel:
 
         try:
 
+            norm1 = np.linalg.norm(vec1)
+            norm2 = np.linalg.norm(vec2)
+
+            if norm1 == 0 or norm2 == 0:
+                return 0.0
+
             return float(
-
-                np.dot(vec1, vec2) /
-
-                (
-
-                    np.linalg.norm(vec1) *
-
-                    np.linalg.norm(vec2)
-
-                )
-
+                np.dot(vec1, vec2) / (norm1 * norm2)
             )
 
         except Exception:

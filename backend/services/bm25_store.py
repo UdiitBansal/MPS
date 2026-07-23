@@ -70,7 +70,7 @@ class BM25Store:
 
             cleaned_docs.append(chunk)
 
-            if metadata_list:
+            if metadata_list and i < len(metadata_list):
 
                 cleaned_metadata.append(
 
@@ -191,6 +191,7 @@ class BM25Store:
             if score <= 0:
 
                 continue
+            meta = meta or {}
 
             key = (
 

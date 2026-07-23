@@ -1,4 +1,5 @@
 from pathlib import Path
+import hashlib
 import shutil
 
 from fastapi import (
@@ -31,53 +32,40 @@ async def upload_pdfs(
     # =====================================================
 
     if not files:
-
         raise HTTPException(
             status_code=400,
             detail="Please upload at least one PDF."
         )
 
     if len(files) > MAX_PDFS:
-
         raise HTTPException(
             status_code=400,
             detail=f"Maximum {MAX_PDFS} PDF files are allowed."
         )
 
     upload_path = Path(UPLOAD_DIR)
-
     upload_path.mkdir(
         parents=True,
         exist_ok=True
     )
 
-    # =====================================================
-    # Remove Old PDFs
-    # =====================================================
-
-    for pdf in upload_path.glob("*.pdf"):
-
-        try:
-            pdf.unlink()
-        except Exception:
-            pass
-
     uploaded_files = []
-
     uploaded_info = []
 
     total_size = 0
 
     used_names = set()
+    file_hashes = set()
+
+    validated_files = []
 
     # =====================================================
-    # Save Files
+    # Validate Files First
     # =====================================================
 
     for file in files:
 
         if not file.filename:
-
             raise HTTPException(
                 status_code=400,
                 detail="Invalid filename."
@@ -85,27 +73,46 @@ async def upload_pdfs(
 
         filename = Path(file.filename).name.strip()
 
+        if not filename:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid filename."
+            )
+
         extension = Path(filename).suffix.lower()
 
         if extension not in SUPPORTED_FILE_TYPES:
-
             raise HTTPException(
                 status_code=400,
                 detail=f"{filename} is not a supported PDF."
             )
 
-        # ---------------------------------------------
-        # Prevent Duplicate Names
-        # ---------------------------------------------
+        validated_files.append(file)
+
+    # =====================================================
+    # Remove Previous PDFs
+    # =====================================================
+
+    for pdf in upload_path.glob("*.pdf"):
+        try:
+            pdf.unlink()
+        except Exception:
+            pass
+
+    # =====================================================
+    # Save Files
+    # =====================================================
+
+    for file in validated_files:
+
+        filename = Path(file.filename).name.strip()
 
         original_name = Path(filename).stem
 
         counter = 1
 
         while filename in used_names:
-
             filename = f"{original_name}_{counter}.pdf"
-
             counter += 1
 
         used_names.add(filename)
@@ -115,18 +122,25 @@ async def upload_pdfs(
         try:
 
             with open(destination, "wb") as buffer:
-
                 shutil.copyfileobj(
                     file.file,
                     buffer
                 )
+
+        except Exception as e:
+
+            destination.unlink(missing_ok=True)
+
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to save {filename}: {str(e)}"
+            )
 
         finally:
 
             file.file.close()
 
         if not destination.exists():
-
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to save {filename}."
@@ -151,6 +165,29 @@ async def upload_pdfs(
                 status_code=400,
                 detail=f"{filename} exceeds {MAX_FILE_SIZE_MB} MB."
             )
+
+        # =================================================
+        # Duplicate Content Detection
+        # =================================================
+
+        sha256 = hashlib.sha256()
+
+        with open(destination, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                sha256.update(chunk)
+
+        file_hash = sha256.hexdigest()
+
+        if file_hash in file_hashes:
+
+            destination.unlink(missing_ok=True)
+
+            raise HTTPException(
+                status_code=400,
+                detail=f"Duplicate PDF detected: {filename}"
+            )
+
+        file_hashes.add(file_hash)
 
         uploaded_files.append(filename)
 

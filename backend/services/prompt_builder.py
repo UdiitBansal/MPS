@@ -28,8 +28,13 @@ Rules:
 7. Use clear and professional language.
 8. Use bullet points whenever appropriate.
 9. If the supplied context contains absolutely no information related to the question, reply exactly:
+10. Carefully compare all numbers before answering.
+11. For questions about highest, lowest, topper, rank, marks, score or percentage, do NOT guess.
+12. Only answer after checking every relevant record in the provided context.
+13. If the context does not contain enough records to determine the answer, say:
+"I could not determine the answer from the retrieved document context."
 
-I could not find the answer in the uploaded documents.
+
 
 ==================================================
 DOCUMENT CONTEXT
